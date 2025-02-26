@@ -1,0 +1,6 @@
+﻿services:
+  updatenotifier:
+    image: updatenotifier
+    build:
+      context: .
+      dockerfile: UpdateNotifier/Dockerfile
