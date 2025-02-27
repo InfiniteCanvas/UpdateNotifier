@@ -12,16 +12,14 @@ namespace UpdateNotifier.Services;
 public class DiscordBotService(
 	DiscordSocketClient        client,
 	InteractionService         interactionService,
-	IServiceProvider           services,
 	CommandHandler             commandHandler,
 	Config                     config,
 	ILogger<DiscordBotService> logger)
 	: BackgroundService
 {
-	private readonly IServiceProvider _services = services;
-
 	protected override async Task ExecuteAsync(CancellationToken stoppingToken)
 	{
+		logger.ZLogInformation($"Config: {config}");
 		client.Log += LogAsync;
 		interactionService.Log += LogAsync;
 
@@ -53,32 +51,8 @@ public class DiscordBotService(
 
 	private async Task ReadyAsync()
 	{
-		logger.ZLog(LogLevel.Information, $"Bot is connected and ready!");
-
-		// Register commands globally or to a specific guild based on environment
-		if (config.IsProduction)
-		{
-			await interactionService.RegisterCommandsGloballyAsync();
-			logger.ZLogInformation($"Registered commands globally");
-		}
-		else
-		{
-			// Register commands to a specific guild for faster testing during development
-			if (config.GuildId.HasValue)
-			{
-				await interactionService.RegisterCommandsToGuildAsync(config.GuildId.Value);
-				logger.ZLogInformation($"Registered commands to guild {config.GuildId.Value}");
-			}
-			else
-			{
-				logger.ZLogWarning($"No guild ID specified for development. Commands not registered.");
-			}
-		}
-
-		// Initialize command handler
+		logger.ZLog(LogLevel.Information, $"Discord client is connected and ready! Registering commands...");
 		await commandHandler.InitializeAsync();
-
-		// Set bot status
 		await client.SetGameAsync("Monitoring game updates", type: ActivityType.Watching);
 	}
 

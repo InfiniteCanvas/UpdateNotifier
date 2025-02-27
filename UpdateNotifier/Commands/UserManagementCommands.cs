@@ -1,12 +1,12 @@
 ﻿using Discord;
 using Discord.Interactions;
 using Microsoft.Extensions.Logging;
-using UpdateNotifier.Services;
+using UpdateNotifier.Data;
 using ZLogger;
 
 namespace UpdateNotifier.Commands;
 
-public sealed class UserManagementCommands(NotificationService notificationService, ILogger<UserManagementCommands> logger)
+public sealed class UserManagementCommands(ILogger<UserManagementCommands> logger, DataContext db)
 	: InteractionModuleBase<SocketInteractionContext>
 {
 	[SlashCommand("enable", "Enable the bot's functions by accepting the Terms of Service")]
@@ -15,7 +15,7 @@ public sealed class UserManagementCommands(NotificationService notificationServi
 		var userId = Context.User.Id;
 
 		// Check if user already exists and has accepted ToS
-		var userExists = await notificationService.UserExistsAsync(userId);
+		var userExists = db.UserExists(userId);
 
 		if (userExists)
 		{
@@ -58,7 +58,7 @@ public sealed class UserManagementCommands(NotificationService notificationServi
 		var userId = Context.User.Id;
 
 		// Add user to database
-		var success = await notificationService.AddUserAsync(userId);
+		var success = db.AddUser(userId);
 
 		if (success)
 		{
@@ -104,7 +104,7 @@ public sealed class UserManagementCommands(NotificationService notificationServi
 	public async Task DisableBot()
 	{
 		var userId = Context.User.Id;
-		if (!await notificationService.UserExistsAsync(userId))
+		if (!db.UserExists(userId))
 			await RespondAsync("This user doesn't exist.");
 
 		var embed = new EmbedBuilder()
@@ -132,7 +132,7 @@ public sealed class UserManagementCommands(NotificationService notificationServi
 	{
 		var userId = Context.User.Id;
 
-		var success = await notificationService.RemoveUserAsync(userId);
+		var success = db.RemoveUser(userId);
 
 		if (success)
 			await ModifyOriginalResponseAsync(msg =>

@@ -3,6 +3,7 @@ using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
 using Microsoft.Extensions.Logging;
+using UpdateNotifier.Utilities;
 using ZLogger;
 
 namespace UpdateNotifier.Commands;
@@ -11,6 +12,7 @@ public sealed class CommandHandler(
 	ILogger<CommandHandler> logger,
 	IServiceProvider        services,
 	DiscordSocketClient     client,
+	Config                  config,
 	InteractionService      interactionService)
 {
 	public async Task InitializeAsync()
@@ -19,6 +21,33 @@ public sealed class CommandHandler(
 		await interactionService.AddModulesAsync(Assembly.GetEntryAssembly(), services);
 		client.InteractionCreated += HandleInteractionAsync;
 		interactionService.SlashCommandExecuted += SlashCommandExecutedAsync;
+
+		try
+		{
+			// Register commands globally or to a specific guild based on environment
+			if (config.IsProduction)
+			{
+				await interactionService.RegisterCommandsGloballyAsync();
+				logger.ZLogInformation($"Registered commands globally");
+			}
+			else
+			{
+				// Register commands to a specific guild for faster testing during development
+				if (config.GuildId.HasValue)
+				{
+					await interactionService.RegisterCommandsToGuildAsync(config.GuildId.Value);
+					logger.ZLogInformation($"Registered commands to guild {config.GuildId.Value}");
+				}
+				else
+				{
+					logger.ZLogWarning($"No guild ID specified for development. Commands not registered.");
+				}
+			}
+		}
+		catch (Exception e)
+		{
+			logger.ZLogCritical(e, $"Error while registering commands");
+		}
 	}
 
 	private async Task HandleInteractionAsync(SocketInteraction interaction)
@@ -49,7 +78,7 @@ public sealed class CommandHandler(
 		if (result.IsSuccess)
 			logger.ZLogTrace($"Slash command '{info.Name}' executed by {context.User.Username}#{context.User.Discriminator} ({context.User.Id})");
 		else
-			logger.ZLogError($"Slash command '{info.Name}' failed by {context.User.Username}#{context.User.Discriminator} ({context.User.Id}); Reason: {result.ErrorReason}");
+			logger.ZLogError($"Slash command '{info.Name}' failed by {context.User.GlobalName} ({context.User.Id}); Reason: {result.ErrorReason}");
 
 		return Task.CompletedTask;
 	}

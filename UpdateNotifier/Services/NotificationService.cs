@@ -1,61 +1,90 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.Threading.Channels;
+using Discord;
+using Discord.WebSocket;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using UpdateNotifier.Data;
 using UpdateNotifier.Data.Models;
 using ZLogger;
+using Game = UpdateNotifier.Data.Models.Game;
 
 namespace UpdateNotifier.Services;
 
-public sealed class NotificationService(DataContext db, ILogger<NotificationService> logger)
+public sealed class NotificationService : BackgroundService
 {
-	public async Task<bool> UserExistsAsync(ulong userId) => await db.Users.AnyAsync(u => u.UserId == userId);
+	private readonly DiscordSocketClient          _client;
+	private readonly ILogger<NotificationService> _logger;
+	private readonly RssMonitorService            _monitorService;
 
-	public async Task<bool> AddUserAsync(ulong userId)
+	private readonly Channel<Notification> _notificationQueue;
+
+	public NotificationService(ILogger<NotificationService> logger, RssMonitorService monitorService, DiscordSocketClient client)
 	{
-		try
+		_client = client;
+		_logger = logger;
+		_monitorService = monitorService;
+		_notificationQueue = Channel.CreateUnbounded<Notification>();
+		_monitorService.GamesUpdatedEvent += OnGamesUpdated;
+		logger.ZLogInformation($"NotificationService is starting.");
+	}
+
+	private void Dispose(bool disposing)
+	{
+		if (disposing) _monitorService.GamesUpdatedEvent -= OnGamesUpdated;
+	}
+
+	public override void Dispose()
+	{
+		Dispose(true);
+		base.Dispose();
+	}
+
+	private void OnGamesUpdated(List<Game> updates)
+	{
+		_logger.ZLogInformation($"Games updated [{updates.Count}]; Notifying subscribers..");
+		var notifications = new Dictionary<User, List<Game>>();
+		foreach (var update in updates)
 		{
-			if (await UserExistsAsync(userId))
-			{
-				logger.ZLogTrace($"User {userId} already exists in database");
-				return true;
-			}
-
-			var user = new DiscordUser { UserId = userId };
-
-			await db.Users.AddAsync(user);
-			await db.SaveChangesAsync();
-
-			logger.ZLogInformation($"User {userId} has been added to database");
-			return true;
+			foreach (var watcher in update.Watchers)
+				if (notifications.TryGetValue(watcher, out var games))
+					games.Add(update);
+				else
+					notifications.Add(watcher, [update]);
 		}
-		catch (Exception e)
+
+		foreach (var notification in notifications)
 		{
-			logger.ZLogError(e, $"Error adding user {userId} to database");
-			return false;
+			_logger.ZLogTrace($"Notifying subscribers for {notification.Key}.");
+			NotifyUser(notification.Key, string.Join('\n', notification.Value.Select(g => g.Url)));
 		}
 	}
 
-	public async Task<bool> RemoveUserAsync(ulong userId)
+	private void NotifyUser(User user, string message)
 	{
 		try
 		{
-			var user = await db.Users.FirstOrDefaultAsync(u => u.UserId == userId);
-			if (user == null)
-			{
-				logger.ZLogTrace($"User {userId} does not exist in database");
-				// return true here since user deletion was the goal and user does not exist
-				return true;
-			}
-
-			db.Users.Remove(user);
-			await db.SaveChangesAsync();
-			logger.ZLogInformation($"User {userId} has been removed from database");
-			return true;
+			_logger.ZLogTrace($"Notifying {user}: {message}");
+			_notificationQueue.Writer.TryWrite(new Notification(user, message));
 		}
-		catch (Exception e)
+		catch
 		{
-			logger.ZLogError(e, $"Error removing user {userId} from database");
-			return false;
+			_logger.ZLogError($"User {user} does not exist, cannot notify.");
 		}
+	}
+
+	protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+	{
+		while (await _notificationQueue.Reader.WaitToReadAsync(stoppingToken))
+		{
+			var notification = await _notificationQueue.Reader.ReadAsync(stoppingToken);
+			var user = await _client.GetUserAsync(notification.User.UserId, new RequestOptions { CancelToken = stoppingToken });
+			_logger.ZLogTrace($"Sending notification to {user.Username}: {notification.Message}");
+			await user.SendMessageAsync(notification.Message, options: new RequestOptions { CancelToken = stoppingToken });
+		}
+	}
+
+	private class Notification(User user, string message)
+	{
+		public readonly string Message = message;
+		public readonly User   User    = user;
 	}
 }

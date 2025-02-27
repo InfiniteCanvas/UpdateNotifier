@@ -1,6 +1,16 @@
 ﻿services:
-  updatenotifier:
-    image: updatenotifier
+  update-notifier:
+    image: update-notifier
     build:
       context: .
       dockerfile: UpdateNotifier/Dockerfile
+    environment:
+      - DISCORD_BOT_TOKEN=${TOKEN}
+      - DISCORD_GUILD_ID=${GUILD_ID}
+      - DATABASE_PATH=/data/app.db
+      - SELF_HOSTED=true # enables supporter features
+      - RSS_UPDATE_INTERVAL=5 # in minutes
+      - XF_USER=${XF_USER}
+      - XF_SESSION=${XF_SESSION}
+    volumes:
+      - ./data:/data

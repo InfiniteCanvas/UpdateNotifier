@@ -1,9 +1,15 @@
-﻿namespace UpdateNotifier.Utilities;
+﻿using Microsoft.Extensions.Logging;
+
+namespace UpdateNotifier.Utilities;
 
 public sealed class Config
 {
-	public Config()
+	private readonly ILogger<Config> _logger;
+
+	public Config(ILogger<Config> logger)
 	{
+		_logger = logger;
+		RssFeedUrl = Environment.GetEnvironmentVariable("RSS_FEED_URL") ?? @"https://f95zone.to/sam/latest_alpha/latest_data.php?cmd=rss&cat=games";
 		BotToken = Environment.GetEnvironmentVariable("DISCORD_BOT_TOKEN")
 		        ?? throw new InvalidOperationException("Bot token not found. Set the DISCORD_BOT_TOKEN environment variable.");
 		IsProduction = Environment.GetEnvironmentVariable("ENVIRONMENT")?.ToLower() == "production";
@@ -34,5 +40,9 @@ public sealed class Config
 	public bool     IsProduction        { get; }
 	public bool     SelfHosted          { get; }
 	public string   DatabasePath        { get; }
+	public string   RssFeedUrl          { get; }
 	public TimeSpan UpdateCheckInterval { get; }
+
+	public override string ToString()
+		=> $"{nameof(BotToken)}: {BotToken}, {nameof(GuildId)}: {GuildId}, {nameof(IsProduction)}: {IsProduction}, {nameof(SelfHosted)}: {SelfHosted}, {nameof(DatabasePath)}: {DatabasePath}, {nameof(UpdateCheckInterval)}: {UpdateCheckInterval}";
 }
