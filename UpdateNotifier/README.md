@@ -23,13 +23,14 @@ Users can manage personalized game watchlists through Discord commands:
 
 Environment variables:
 
-| Variable            | Default      | Description                                    |
-|---------------------|--------------|------------------------------------------------|
-| DISCORD_BOT_TOKEN   | -            | Your discord bot token                         |
-| DISCORD_GUILD_ID    | -            | Your discord server                            |
-| DATABASE_PATH       | /data/app.db | SQLite db location                             |
-| RSS_UPDATE_INTERVAL | 300          | How often it checks the RSS feeds (in Seconds) |
-| SELF_HOSTED         | false        | Basically makes you a supporter your instance  |
+| Variable            | Default      | Description                                                              |
+|---------------------|--------------|--------------------------------------------------------------------------|
+| DISCORD_BOT_TOKEN   | -            | Your discord bot token                                                   |
+| DISCORD_GUILD_ID    | -            | Your discord server                                                      |
+| DATABASE_PATH       | /data/app.db | SQLite db location                                                       |
+| ENVIRONMENT         | development  | `production` registers commands globally, else it registers to the guild |
+| RSS_UPDATE_INTERVAL | 5            | How often it checks the RSS feeds (in minutes)                           |
+| SELF_HOSTED         | false        | Basically makes you a supporter your instance                            |
 
 ## Command Reference
 
@@ -57,7 +58,7 @@ services:
       - DISCORD_GUILD_ID=${GUILD_ID}
       - DATABASE_PATH=/data/app.db
       - SELF_HOSTED=true # enables supporter features
-      - RSS_UPDATE_INTERVAL=300
+      - RSS_UPDATE_INTERVAL=5 # in minutes
     volumes:
       - ./data:/data
 ```

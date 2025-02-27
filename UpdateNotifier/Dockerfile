@@ -14,6 +14,11 @@ RUN dotnet build "UpdateNotifier.csproj" -c $BUILD_CONFIGURATION -o /app/build
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
 RUN dotnet publish "UpdateNotifier.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+ENV DISCORD_BOT_TOKEN=""
+ENV DISCORD_GUILD_ID=""
+ENV DATABASE_PATH="/data/app.db"
+ENV SELF_HOSTED=false
+ENV RSS_UPDATE_INTERVAL=5
 
 FROM base AS final
 WORKDIR /app
