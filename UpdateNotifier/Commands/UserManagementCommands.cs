@@ -6,8 +6,7 @@ using ZLogger;
 
 namespace UpdateNotifier.Commands;
 
-public sealed class UserManagementCommands(ILogger<UserManagementCommands> logger, DataContext db)
-	: InteractionModuleBase<SocketInteractionContext>
+public sealed class UserManagementCommands(ILogger<UserManagementCommands> logger, DataContext db) : InteractionModuleBase<SocketInteractionContext>
 {
 	[SlashCommand("enable", "Enable the bot's functions by accepting the Terms of Service")]
 	public async Task EnableBot()
@@ -62,50 +61,53 @@ public sealed class UserManagementCommands(ILogger<UserManagementCommands> logge
 
 		if (success)
 		{
-			await ModifyOriginalResponseAsync(msg =>
-			                                  {
-				                                  msg.Embed = new EmbedBuilder()
-				                                             .WithTitle("Terms Accepted")
-				                                             .WithDescription("Nice. You can now use all bot functions and add games to your watchlist.")
-				                                             .WithColor(Color.Green)
-				                                             .Build();
-				                                  msg.Components = null;
-			                                  });
+			await RespondAsync(embeds:
+			                   [
+				                   new EmbedBuilder()
+					                  .WithTitle("Terms Accepted")
+					                  .WithDescription("Nice. You can now use all bot functions and add games to your watchlist.")
+					                  .WithColor(Color.Green)
+					                  .Build(),
+			                   ],
+			                   ephemeral: true);
 			logger.ZLogInformation($"User {userId} added to the database.");
 		}
 		else
 		{
-			await ModifyOriginalResponseAsync(msg =>
-			                                  {
-				                                  msg.Embed = new EmbedBuilder()
-				                                             .WithTitle("Error")
-				                                             .WithDescription("There was an error enabling your account. Please try again later.")
-				                                             .WithColor(Color.Red)
-				                                             .Build();
-				                                  msg.Components = null;
-			                                  });
+			await RespondAsync(embeds:
+			                   [
+				                   new EmbedBuilder()
+					                  .WithTitle("Error")
+					                  .WithDescription("There was an error enabling your account. Please try again later.")
+					                  .WithColor(Color.Red)
+					                  .Build(),
+			                   ],
+			                   ephemeral: true);
 			logger.ZLogError($"Error adding user {userId} to the database.");
 		}
 	}
 
 	[ComponentInteraction("decline_tos")]
 	public async Task DeclineTos()
-		=> await ModifyOriginalResponseAsync(msg =>
-		                                     {
-			                                     msg.Embed = new EmbedBuilder()
-			                                                .WithTitle("Terms Declined")
-			                                                .WithDescription("You have declined the Terms of Service. Bot functions will not be enabled for your account.")
-			                                                .WithColor(Color.Red)
-			                                                .Build();
-			                                     msg.Components = null;
-		                                     });
+		=> await RespondAsync(embeds:
+		                      [
+			                      new EmbedBuilder()
+				                     .WithTitle("Terms Declined")
+				                     .WithDescription("You have declined the Terms of Service. Bot functions will not be enabled for your account.")
+				                     .WithColor(Color.Red)
+				                     .Build(),
+		                      ],
+		                      ephemeral: true);
 
 	[SlashCommand("disable", "Disable the bot's functions and delete all user data.")]
 	public async Task DisableBot()
 	{
 		var userId = Context.User.Id;
 		if (!db.UserExists(userId))
-			await RespondAsync("This user doesn't exist.");
+		{
+			await RespondAsync("This user doesn't exist.", ephemeral: true);
+			return;
+		}
 
 		var embed = new EmbedBuilder()
 		           .WithTitle("Are you sure?")
@@ -135,36 +137,36 @@ public sealed class UserManagementCommands(ILogger<UserManagementCommands> logge
 		var success = db.RemoveUser(userId);
 
 		if (success)
-			await ModifyOriginalResponseAsync(msg =>
-			                                  {
-				                                  msg.Embed = new EmbedBuilder()
-				                                             .WithTitle("User deleted.")
-				                                             .WithDescription("RIP.")
-				                                             .WithColor(Color.Red)
-				                                             .Build();
-				                                  msg.Components = null;
-			                                  });
+			await RespondAsync(embeds:
+			                   [
+				                   new EmbedBuilder()
+					                  .WithTitle("User deleted.")
+					                  .WithDescription("RIP.")
+					                  .WithColor(Color.Red)
+					                  .Build(),
+			                   ],
+			                   ephemeral: true);
 		else
-			await ModifyOriginalResponseAsync(msg =>
-			                                  {
-				                                  msg.Embed = new EmbedBuilder()
-				                                             .WithTitle("Error")
-				                                             .WithDescription("There was an error deleting your account. Please try again later.")
-				                                             .WithColor(Color.Red)
-				                                             .Build();
-				                                  msg.Components = null;
-			                                  });
+			await RespondAsync(embeds:
+			                   [
+				                   new EmbedBuilder()
+					                  .WithTitle("Error")
+					                  .WithDescription("There was an error deleting your account. Please try again later.")
+					                  .WithColor(Color.Red)
+					                  .Build(),
+			                   ],
+			                   ephemeral: true);
 	}
 
 	[ComponentInteraction("decline_deletion")]
 	public async Task DeclineDeletion()
-		=> await ModifyOriginalResponseAsync(msg =>
-		                                     {
-			                                     msg.Embed = new EmbedBuilder()
-			                                                .WithTitle("Deletion declined")
-			                                                .WithDescription("Nice. Continue enjoying your porn.")
-			                                                .WithColor(Color.Green)
-			                                                .Build();
-			                                     msg.Components = null;
-		                                     });
+		=> await RespondAsync(embeds:
+		                      [
+			                      new EmbedBuilder()
+				                     .WithTitle("Deletion declined")
+				                     .WithDescription("Nice. Continue enjoying the bot.")
+				                     .WithColor(Color.Green)
+				                     .Build(),
+		                      ],
+		                      ephemeral: true);
 }

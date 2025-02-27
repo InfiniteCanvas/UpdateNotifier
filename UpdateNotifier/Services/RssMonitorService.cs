@@ -16,11 +16,10 @@ public sealed class RssMonitorService : BackgroundService
 {
 	private readonly Config                     _config;
 	private readonly DataContext                _db;
+	private readonly HttpClient                 _httpClient;
 	private readonly ILogger<RssMonitorService> _logger;
-	private readonly CookieContainer            _cookieContainer;
 	private          IDisposable                _disposable = null!;
 	private          SyndicationFeed?           _feed;
-	private readonly HttpClient                 _httpClient;
 
 	public RssMonitorService(ILogger<RssMonitorService> logger,
 	                         Config                     config,
@@ -29,8 +28,10 @@ public sealed class RssMonitorService : BackgroundService
 		_logger = logger;
 		_config = config;
 		_db = db;
-		_cookieContainer = new CookieContainer();
-		_httpClient = new HttpClient(new HttpClientHandler { CookieContainer = _cookieContainer, UseCookies = true });
+		var cookieContainer = new CookieContainer();
+		cookieContainer.Add(new Uri(_config.RssFeedUrl), new Cookie("xf_user",    _config.XfUser));
+		cookieContainer.Add(new Uri(_config.RssFeedUrl), new Cookie("xf_session", _config.XfSession));
+		_httpClient = new HttpClient(new HttpClientHandler { CookieContainer = cookieContainer, UseCookies = true });
 	}
 
 	public event Action<List<Game>>? GamesUpdatedEvent;
@@ -95,11 +96,6 @@ public sealed class RssMonitorService : BackgroundService
 	{
 		try
 		{
-			// Set cookies if needed before request
-			_cookieContainer.Add(new Uri(_config.RssFeedUrl), new Cookie("xf_user",    "277%2C3oE_qvfjALpH8Q2ddBRpuB5twhvX6qzfr65487Wv"));
-			_cookieContainer.Add(new Uri(_config.RssFeedUrl), new Cookie("xf_session", "t4-o-i2R5Z_emHYFLx04DLsPMkskAj4y"));
-
-			// Get feed stream with configured HttpClient
 			await using var stream = await _httpClient.GetStreamAsync(_config.RssFeedUrl);
 			using var reader = XmlReader.Create(stream);
 

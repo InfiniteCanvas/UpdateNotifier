@@ -6,16 +6,26 @@ using ZLogger;
 
 namespace UpdateNotifier.Data;
 
-public sealed class DataContext(ILogger<DataContext> logger, Config config) : DbContext
+public sealed class DataContext : DbContext
 {
+	private readonly Config               _config;
+	private readonly ILogger<DataContext> _logger;
+
+	public DataContext(ILogger<DataContext> logger, Config config)
+	{
+		_logger = logger;
+		_config = config;
+		Database.EnsureCreated();
+	}
+
 	public DbSet<User>           Users     => Set<User>();
 	public DbSet<Game>           Games     => Set<Game>();
 	public DbSet<WatchlistEntry> Watchlist => Set<WatchlistEntry>();
 
 	protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 	{
-		optionsBuilder.UseSqlite($"Data Source={config.DatabasePath}");
-		logger.ZLogInformation($"Database path: {config.DatabasePath}");
+		optionsBuilder.UseSqlite($"Data Source={_config.DatabasePath}");
+		_logger.ZLogInformation($"Database path: {_config.DatabasePath}");
 	}
 
 	protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -36,7 +46,7 @@ public sealed class DataContext(ILogger<DataContext> logger, Config config) : Db
 		{
 			if (UserExists(userId))
 			{
-				logger.ZLogTrace($"User {userId} already exists in database");
+				_logger.ZLogTrace($"User {userId} already exists in database");
 				return true;
 			}
 
@@ -45,12 +55,12 @@ public sealed class DataContext(ILogger<DataContext> logger, Config config) : Db
 			Users.Add(user);
 			SaveChanges();
 
-			logger.ZLogInformation($"User {userId} has been added to database");
+			_logger.ZLogInformation($"User {userId} has been added to database");
 			return true;
 		}
 		catch (Exception e)
 		{
-			logger.ZLogError(e, $"Error adding user {userId} to database");
+			_logger.ZLogError(e, $"Error adding user {userId} to database");
 			return false;
 		}
 	}
@@ -62,19 +72,19 @@ public sealed class DataContext(ILogger<DataContext> logger, Config config) : Db
 			var user = Users.FirstOrDefault(u => u.UserId == userId);
 			if (user == null)
 			{
-				logger.ZLogTrace($"User {userId} does not exist in database");
+				_logger.ZLogTrace($"User {userId} does not exist in database");
 				// return true here since user deletion was the goal and user does not exist
 				return true;
 			}
 
 			Users.Remove(user);
 			SaveChangesAsync();
-			logger.ZLogInformation($"User {userId} has been removed from database");
+			_logger.ZLogInformation($"User {userId} has been removed from database");
 			return true;
 		}
 		catch (Exception e)
 		{
-			logger.ZLogError(e, $"Error removing user {userId} from database");
+			_logger.ZLogError(e, $"Error removing user {userId} from database");
 			return false;
 		}
 	}

@@ -12,6 +12,8 @@ public sealed class Config
 		RssFeedUrl = Environment.GetEnvironmentVariable("RSS_FEED_URL") ?? @"https://f95zone.to/sam/latest_alpha/latest_data.php?cmd=rss&cat=games";
 		BotToken = Environment.GetEnvironmentVariable("DISCORD_BOT_TOKEN")
 		        ?? throw new InvalidOperationException("Bot token not found. Set the DISCORD_BOT_TOKEN environment variable.");
+		XfUser = Environment.GetEnvironmentVariable("XF_USER")       ?? string.Empty;
+		XfSession = Environment.GetEnvironmentVariable("XF_SESSION") ?? string.Empty;
 		IsProduction = Environment.GetEnvironmentVariable("ENVIRONMENT")?.ToLower() == "production";
 		SelfHosted = Environment.GetEnvironmentVariable("SELF_HOSTED")?.ToLower()   == "true";
 
@@ -42,6 +44,8 @@ public sealed class Config
 	public string   DatabasePath        { get; }
 	public string   RssFeedUrl          { get; }
 	public TimeSpan UpdateCheckInterval { get; }
+	public string   XfUser              { get; }
+	public string   XfSession           { get; }
 
 	public override string ToString()
 		=> $"{nameof(BotToken)}: {BotToken}, {nameof(GuildId)}: {GuildId}, {nameof(IsProduction)}: {IsProduction}, {nameof(SelfHosted)}: {SelfHosted}, {nameof(DatabasePath)}: {DatabasePath}, {nameof(UpdateCheckInterval)}: {UpdateCheckInterval}";
