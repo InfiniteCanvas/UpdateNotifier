@@ -17,6 +17,11 @@ Users can manage personalized game watchlists through Discord commands:
 - Remove games from watchlist
 - View current watchlist
 
+## Planned Supporter Features
+
+- get updates on custom RSS feeds
+- add to watchlist directly from the thread using a plugin (more likely to be a tamper monkey script for now)
+
 ## Command Reference
 
 | Command                   | Description                                                                                                    | Example                                                             |
