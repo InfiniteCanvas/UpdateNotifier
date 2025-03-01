@@ -9,6 +9,7 @@ using UpdateNotifier.Commands;
 using UpdateNotifier.Data;
 using UpdateNotifier.Services;
 using UpdateNotifier.Utilities;
+using Utf8StringInterpolation;
 using ZLogger;
 using ZLogger.Providers;
 
@@ -34,10 +35,43 @@ internal class Program
 
 	private static void ConfigureLogging(ILoggingBuilder obj)
 		=> obj.ClearProviders()
-		      .AddZLoggerConsole()
-		      .AddZLoggerRollingFile((timestamp, sequenceNumber) => $"logs/{timestamp.ToLocalTime():yyyy-MM-dd}_{sequenceNumber:000}.log",
-		                             RollingInterval.Day,
-		                             5 * 1024 * 1024)
+		      .AddZLoggerConsole(options =>
+		                         {
+			                         options.UsePlainTextFormatter(formatter =>
+			                                                       {
+				                                                       formatter.SetPrefixFormatter($"{0}|{1:short}| ",
+				                                                                                    (in MessageTemplate template, in LogInfo info)
+					                                                                                    => template.Format(info.Timestamp, info.LogLevel));
+				                                                       formatter.SetSuffixFormatter($" ({0})",
+				                                                                                    (in MessageTemplate template, in LogInfo info)
+					                                                                                    => template.Format(info.Category));
+				                                                       formatter.SetExceptionFormatter((writer, ex)
+					                                                                                       => Utf8String.Format(writer,
+						                                                                                       $"{ex.Message}"));
+			                                                       });
+		                         })
+		      .AddZLoggerRollingFile((options, provider) =>
+		                             {
+			                             var logFolder = Environment.GetEnvironmentVariable("LOGS_FOLDER") ?? "/data/logs";
+			                             options.RollingInterval = RollingInterval.Day;
+			                             options.RollingSizeKB = 10 * 1024;
+			                             options.FullMode = BackgroundBufferFullMode.Grow;
+			                             options.FilePathSelector = (timestamp, sequenceNumber)
+				                                                        => Path.Combine(logFolder,
+				                                                                        $"{timestamp.ToLocalTime():yyyy-MM-dd}_{sequenceNumber:000}.log");
+			                             options.UsePlainTextFormatter(formatter =>
+			                                                           {
+				                                                           formatter.SetPrefixFormatter($"{0}|{1:short}| ",
+				                                                                                        (in MessageTemplate template, in LogInfo info)
+					                                                                                        => template.Format(info.Timestamp, info.LogLevel));
+				                                                           formatter.SetSuffixFormatter($" ({0})",
+				                                                                                        (in MessageTemplate template, in LogInfo info)
+					                                                                                        => template.Format(info.Category));
+				                                                           formatter.SetExceptionFormatter((writer, ex)
+					                                                                                           => Utf8String.Format(writer,
+						                                                                                           $"{ex.Message}"));
+			                                                           });
+		                             })
 		      .SetMinimumLevel(LogLevel.Trace);
 
 	private static void ConfigureServices(IServiceCollection serviceCollection)

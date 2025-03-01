@@ -49,7 +49,6 @@ public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db
 				game = await db.Games.FindAsync(threadId) ?? new Game();
 				dbUser.Games.Add(game);
 				valid.Add(url);
-				// db.Watchlist.Add(new WatchlistEntry { GameId = game.GameId, UserId = user.Id });
 				logger.ZLogDebug($"Added {url} to watchlist of user {user.Id}");
 			}
 		}

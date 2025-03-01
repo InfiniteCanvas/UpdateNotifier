@@ -16,6 +16,8 @@ public sealed class Config
 		XfSession = Environment.GetEnvironmentVariable("XF_SESSION") ?? string.Empty;
 		IsProduction = Environment.GetEnvironmentVariable("ENVIRONMENT")?.ToLower() == "production";
 		SelfHosted = Environment.GetEnvironmentVariable("SELF_HOSTED")?.ToLower()   == "true";
+		DatabasePath = Environment.GetEnvironmentVariable("DATABASE_PATH") ?? "/data/app.db";
+		LogsFolderPath = Environment.GetEnvironmentVariable("LOGS_FOLDER") ?? "/data/logs";
 
 		var guildIdStr = Environment.GetEnvironmentVariable("DISCORD_GUILD_ID");
 		if (!string.IsNullOrEmpty(guildIdStr) && ulong.TryParse(guildIdStr, out var guildId))
@@ -27,8 +29,6 @@ public sealed class Config
 			if (!IsProduction)
 				throw new InvalidOperationException("No guild ID is provided for dev mode. Set the DISCORD_GUILD_ID environment variable.");
 		}
-
-		DatabasePath = Environment.GetEnvironmentVariable("DATABASE_PATH") ?? "/data/app.db";
 
 		var intervalStr = Environment.GetEnvironmentVariable("RSS_UPDATE_INTERVAL");
 		if (!string.IsNullOrEmpty(intervalStr) && int.TryParse(intervalStr, out var minutes) && minutes > 0)
@@ -42,11 +42,12 @@ public sealed class Config
 	public bool     IsProduction        { get; }
 	public bool     SelfHosted          { get; }
 	public string   DatabasePath        { get; }
+	public string   LogsFolderPath      { get; }
 	public string   RssFeedUrl          { get; }
 	public TimeSpan UpdateCheckInterval { get; }
 	public string   XfUser              { get; }
 	public string   XfSession           { get; }
 
 	public override string ToString()
-		=> $"{nameof(BotToken)}: {BotToken}, {nameof(GuildId)}: {GuildId}, {nameof(IsProduction)}: {IsProduction}, {nameof(SelfHosted)}: {SelfHosted}, {nameof(DatabasePath)}: {DatabasePath}, {nameof(UpdateCheckInterval)}: {UpdateCheckInterval}";
+		=> $"{nameof(DatabasePath)}: {DatabasePath}, {nameof(LogsFolderPath)}: {LogsFolderPath}, {nameof(UpdateCheckInterval)}: {UpdateCheckInterval}, {nameof(RssFeedUrl)}: {RssFeedUrl}";
 }
