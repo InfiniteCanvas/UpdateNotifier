@@ -39,7 +39,9 @@
     </ItemGroup>
 
     <ItemGroup>
-        <None Include="bin\Debug\net9.0\app.db"/>
+        <None Update="appsettings.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
     </ItemGroup>
 
 </Project>

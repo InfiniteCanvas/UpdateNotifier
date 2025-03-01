@@ -110,8 +110,8 @@ internal class Program
 		                 .AddHostedService(provider => provider.GetRequiredService<NotificationService>())
 		                 .AddSingleton<RssMonitorService>()
 		                 .AddHostedService(provider => provider.GetRequiredService<RssMonitorService>())
-		                 .AddSingleton<DataContext>()
 		                 .AddSingleton<GameInfoProvider>()
+		                 .AddDbContext<DataContext>()
 		                 .AddHttpClient("RssFeed",
 		                                (provider, client) =>
 		                                {

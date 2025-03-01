@@ -70,7 +70,7 @@ public sealed class UserManagementCommands(ILogger<UserManagementCommands> logge
 					                  .Build(),
 			                   ],
 			                   ephemeral: true);
-			logger.ZLogInformation($"User {userId} added to the database.");
+			logger.ZLogInformation($"User {Context.User.GlobalName} added to the database.");
 		}
 		else
 		{
@@ -83,21 +83,24 @@ public sealed class UserManagementCommands(ILogger<UserManagementCommands> logge
 					                  .Build(),
 			                   ],
 			                   ephemeral: true);
-			logger.ZLogError($"Error adding user {userId} to the database.");
+			logger.ZLogError($"Error adding user {Context.User.GlobalName} to the database.");
 		}
 	}
 
 	[ComponentInteraction("decline_tos")]
 	public async Task DeclineTos()
-		=> await RespondAsync(embeds:
-		                      [
-			                      new EmbedBuilder()
-				                     .WithTitle("Terms Declined")
-				                     .WithDescription("You have declined the Terms of Service. Bot functions will not be enabled for your account.")
-				                     .WithColor(Color.Red)
-				                     .Build(),
-		                      ],
-		                      ephemeral: true);
+	{
+		await RespondAsync(embeds:
+		                   [
+			                   new EmbedBuilder()
+				                  .WithTitle("Terms Declined")
+				                  .WithDescription("You have declined the Terms of Service. Bot functions will not be enabled for your account.")
+				                  .WithColor(Color.Red)
+				                  .Build(),
+		                   ],
+		                   ephemeral: true);
+		logger.ZLogDebug($"User {Context.User.GlobalName} declined ToS.");
+	}
 
 	[SlashCommand("disable", "Disable the bot's functions and delete all user data.")]
 	public async Task DisableBot()
@@ -124,7 +127,7 @@ public sealed class UserManagementCommands(ILogger<UserManagementCommands> logge
 		                .WithButton("Decline", "decline_deletion", ButtonStyle.Danger)
 		                .Build();
 
-		logger.ZLogDebug($"User {userId} is trying to disable the bot's functions and delete all user data.");
+		logger.ZLogDebug($"User {Context.User.GlobalName} is trying to disable the bot's functions and delete all user data.");
 
 		await RespondAsync(embed: embed, components: components, ephemeral: true);
 	}
@@ -137,6 +140,7 @@ public sealed class UserManagementCommands(ILogger<UserManagementCommands> logge
 		var success = db.RemoveUser(userId);
 
 		if (success)
+		{
 			await RespondAsync(embeds:
 			                   [
 				                   new EmbedBuilder()
@@ -146,7 +150,10 @@ public sealed class UserManagementCommands(ILogger<UserManagementCommands> logge
 					                  .Build(),
 			                   ],
 			                   ephemeral: true);
+			logger.ZLogDebug($"User {Context.User.GlobalName} is disabled and all user data was deleted.");
+		}
 		else
+		{
 			await RespondAsync(embeds:
 			                   [
 				                   new EmbedBuilder()
@@ -156,17 +163,22 @@ public sealed class UserManagementCommands(ILogger<UserManagementCommands> logge
 					                  .Build(),
 			                   ],
 			                   ephemeral: true);
+			logger.ZLogError($"User {Context.User.GlobalName} could not be removed from the database.");
+		}
 	}
 
 	[ComponentInteraction("decline_deletion")]
 	public async Task DeclineDeletion()
-		=> await RespondAsync(embeds:
-		                      [
-			                      new EmbedBuilder()
-				                     .WithTitle("Deletion declined")
-				                     .WithDescription("Nice. Continue enjoying the bot.")
-				                     .WithColor(Color.Green)
-				                     .Build(),
-		                      ],
-		                      ephemeral: true);
+	{
+		await RespondAsync(embeds:
+		                   [
+			                   new EmbedBuilder()
+				                  .WithTitle("Deletion declined")
+				                  .WithDescription("Nice. Continue enjoying the bot.")
+				                  .WithColor(Color.Green)
+				                  .Build(),
+		                   ],
+		                   ephemeral: true);
+		logger.ZLogDebug($"User {Context.User.GlobalName} declined deletion.");
+	}
 }

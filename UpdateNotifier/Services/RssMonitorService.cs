@@ -1,4 +1,5 @@
-﻿using System.ServiceModel.Syndication;
+﻿using System.Collections.Immutable;
+using System.ServiceModel.Syndication;
 using System.Xml;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
@@ -46,10 +47,11 @@ public sealed class RssMonitorService(
 		await _timedSemaphore.WaitAsync(ct);
 		logger.ZLogInformation($"RssMonitorService is checking the feed for updates.");
 		GetFeed().GetAwaiter().GetResult();
-		var feed = _feed == null ? [] : Transform(_feed).ToArray();
+		var feed = _feed == null ? [] : Transform(_feed).ToImmutableList();
 		// to list so we actually fetch the query
-		var toCheck = db.Games.Include(g => g.Watchers).Where(dbGame => feed.Contains(dbGame)).ToArray();
-		var toAdd = feed.Except(toCheck).ToList();
+		var toCheck = db.Games.Include(g => g.Watchers).Where(dbGame => feed.Contains(dbGame)).ToImmutableList();
+		logger.ZLogTrace($"To Check: {toCheck}");
+		var toAdd = feed.Except(toCheck).ToImmutableList();
 		var toUpdate = new List<Game>();
 
 		foreach (var dbGame in toCheck)
