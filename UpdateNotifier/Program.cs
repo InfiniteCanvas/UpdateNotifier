@@ -1,4 +1,5 @@
-﻿using Discord;
+﻿using System.Net;
+using Discord;
 using Discord.Interactions;
 using Discord.Rest;
 using Discord.WebSocket;
@@ -111,6 +112,19 @@ internal class Program
 		                 .AddHostedService(provider => provider.GetRequiredService<RssMonitorService>())
 		                 .AddSingleton<DataContext>()
 		                 .AddSingleton<GameInfoProvider>()
-		                 .AddHttpClient();
+		                 .AddHttpClient("RssFeed",
+		                                (provider, client) =>
+		                                {
+			                                var config = provider.GetRequiredService<Config>();
+			                                client.BaseAddress = new Uri(config.RssFeedUrl);
+		                                })
+		                 .ConfigurePrimaryHttpMessageHandler(provider =>
+		                                                     {
+			                                                     var config = provider.GetRequiredService<Config>();
+			                                                     var handler = new HttpClientHandler { UseCookies = true, CookieContainer = new CookieContainer() };
+			                                                     handler.CookieContainer.Add(new Uri(config.RssFeedUrl), new Cookie("xf_user",    config.XfUser));
+			                                                     handler.CookieContainer.Add(new Uri(config.RssFeedUrl), new Cookie("xf_session", config.XfSession));
+			                                                     return handler;
+		                                                     });
 	}
 }

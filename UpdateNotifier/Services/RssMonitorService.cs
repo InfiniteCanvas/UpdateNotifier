@@ -1,5 +1,4 @@
-﻿using System.Net;
-using System.ServiceModel.Syndication;
+﻿using System.ServiceModel.Syndication;
 using System.Xml;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
@@ -12,57 +11,44 @@ using ZLogger;
 
 namespace UpdateNotifier.Services;
 
-public sealed class RssMonitorService : BackgroundService
+public sealed class RssMonitorService(
+	ILogger<RssMonitorService> logger,
+	Config                     config,
+	DataContext                db,
+	IHttpClientFactory         httpClientFactory)
+	: BackgroundService
 {
-	private readonly Config                     _config;
-	private readonly DataContext                _db;
-	private readonly HttpClient                 _httpClient;
-	private readonly ILogger<RssMonitorService> _logger;
-	private          IDisposable                _disposable = null!;
-	private          SyndicationFeed?           _feed;
-
-	public RssMonitorService(ILogger<RssMonitorService> logger,
-	                         Config                     config,
-	                         DataContext                db)
-	{
-		_logger = logger;
-		_config = config;
-		_db = db;
-		var cookieContainer = new CookieContainer();
-		cookieContainer.Add(new Uri(_config.RssFeedUrl), new Cookie("xf_user",    _config.XfUser));
-		cookieContainer.Add(new Uri(_config.RssFeedUrl), new Cookie("xf_session", _config.XfSession));
-		_httpClient = new HttpClient(new HttpClientHandler { CookieContainer = cookieContainer, UseCookies = true });
-	}
+	private readonly TimedSemaphore   _timedSemaphore = new(2, 2, TimeSpan.FromMinutes(1));
+	private          IDisposable      _disposable     = null!;
+	private          SyndicationFeed? _feed;
 
 	public event Action<List<Game>>? GamesUpdatedEvent;
 
-	private void Dispose(bool disposing)
-	{
-		if (disposing) _disposable.Dispose();
-	}
-
 	public override void Dispose()
 	{
-		Dispose(true);
+		_disposable.Dispose();
 		base.Dispose();
 	}
 
 	protected override async Task ExecuteAsync(CancellationToken stoppingToken)
 	{
-		_logger.ZLogInformation($"RssMonitorService is starting.");
-		_disposable = Observable.Interval(TimeSpan.FromMinutes(1), stoppingToken)
-		                        .TakeUntil(stoppingToken)
-		                        .Subscribe(CheckFeedAndQueueNotification);
+		logger.ZLogInformation($"RssMonitorService is starting.");
+		var bag = new DisposableBag(2);
+		bag.Add(Observable.Interval(config.UpdateCheckInterval, stoppingToken)
+		                  .TakeUntil(stoppingToken)
+		                  .SubscribeAwait(CheckFeedAndQueueNotification));
+		_disposable = bag;
 		await Task.Delay(-1, stoppingToken);
 	}
 
-	private void CheckFeedAndQueueNotification(Unit _)
+	private async ValueTask CheckFeedAndQueueNotification(Unit _, CancellationToken ct)
 	{
-		_logger.ZLogInformation($"RssMonitorService is checking the feed for updates.");
+		await _timedSemaphore.WaitAsync(ct);
+		logger.ZLogInformation($"RssMonitorService is checking the feed for updates.");
 		GetFeed().GetAwaiter().GetResult();
 		var feed = _feed == null ? [] : Transform(_feed).ToArray();
 		// to list so we actually fetch the query
-		var toCheck = _db.Games.Include(g => g.Watchers).Where(dbGame => feed.Contains(dbGame)).ToArray();
+		var toCheck = db.Games.Include(g => g.Watchers).Where(dbGame => feed.Contains(dbGame)).ToArray();
 		var toAdd = feed.Except(toCheck).ToList();
 		var toUpdate = new List<Game>();
 
@@ -77,34 +63,33 @@ public sealed class RssMonitorService : BackgroundService
 
 		if (toAdd.Any())
 		{
-			_logger.ZLogInformation($"Adding [{string.Join(", ", toAdd)}] to database.");
-			_db.Games.AddRange(toAdd);
+			logger.ZLogInformation($"Adding [{string.Join(", ", toAdd)}] to database.");
+			db.Games.AddRange(toAdd);
 		}
 
 		if (toUpdate.Any())
 		{
-			_logger.ZLogInformation($"Updating games: {string.Join(", ", toUpdate)}");
-			_db.UpdateRange(toUpdate);
+			logger.ZLogInformation($"Updating games: {string.Join(", ", toUpdate)}");
+			db.UpdateRange(toUpdate);
 
 			GamesUpdatedEvent?.Invoke(toUpdate);
 		}
 
-		_db.SaveChanges();
+		await db.SaveChangesAsync(ct);
 	}
 
 	private async Task GetFeed()
 	{
 		try
 		{
-			await using var stream = await _httpClient.GetStreamAsync(_config.RssFeedUrl);
+			var client = httpClientFactory.CreateClient("RssFeed");
+			await using var stream = await client.GetStreamAsync(config.RssFeedUrl);
 			using var reader = XmlReader.Create(stream);
-
-			var feed = SyndicationFeed.Load(reader);
-			_feed = feed;
+			_feed = SyndicationFeed.Load(reader);
 		}
 		catch (Exception e)
 		{
-			_logger.ZLogError(e, $"Failed to load RSS feed.");
+			logger.ZLogError(e, $"Failed to load RSS feed.");
 		}
 	}
 
