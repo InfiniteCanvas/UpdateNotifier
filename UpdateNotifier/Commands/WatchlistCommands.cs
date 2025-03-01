@@ -15,8 +15,7 @@ public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db
 	: InteractionModuleBase<SocketInteractionContext>
 {
 	[SlashCommand("watch", "Watch a thread and get updates from it."), Alias("add")]
-	public async Task AddToWatchlist(
-		[Discord.Interactions.Summary(description: "Space-separated list of URLs like this: '/watch url1 url2'", name: "URLs")] string urlsCombined)
+	public async Task AddToWatchlist([Discord.Interactions.Summary(description: "Space-separated list of URLs like this: '/watch url1 url2'")] string urlsCombined)
 	{
 		var urls = urlsCombined.Split(' ');
 		if (Context.User is not SocketGuildUser user)
@@ -35,9 +34,12 @@ public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db
 		}
 
 		if (!user.IsPrivileged() && dbUser.Games.Count >= 69)
+		{
 			await RespondAsync("Wanna keep track of more than 69 games? Support me on patreon!"
 			                 + " Or self-host an instance - instructions on github.",
 			                   ephemeral: true);
+			return;
+		}
 
 		var sanitizedUrls = urls.Select(url => url.GetSanitizedUrl(out var sanitizedUrl) ? sanitizedUrl : string.Empty)
 		                        .Where(s => !string.IsNullOrEmpty(s));
@@ -85,7 +87,7 @@ public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db
 	}
 
 	[SlashCommand("unwatch", "Remove threads from the watchlist."), Alias("remove")]
-	public async Task RemoveFromWatchlist([Discord.Interactions.Summary(description: "Space-separated list of URLs", name: "URLs")] string urlsCombined)
+	public async Task RemoveFromWatchlist([Discord.Interactions.Summary(description: "Space-separated list of URLs")] string urlsCombined)
 	{
 		var urls = urlsCombined.Split(' ');
 		var user = Context.User;
@@ -142,8 +144,8 @@ public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db
 	}
 
 	[SlashCommand("list", "Returns the watchlist. Sends a file if you're watching tons of threads.")]
-	public async Task GetWatchlist([Discord.Interactions.Summary("Include the game's title?")] bool includeTitle = true,
-	                               [Discord.Interactions.Summary("Include the game's url?")]
+	public async Task GetWatchlist([Discord.Interactions.Summary(description: "Include the game's title?")] bool includeTitle = true,
+	                               [Discord.Interactions.Summary(description: "Include the game's url?")]
 	                               bool includeUrl = true)
 	{
 		if (!includeTitle && !includeUrl)

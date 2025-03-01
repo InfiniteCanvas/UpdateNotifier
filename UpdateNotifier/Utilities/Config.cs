@@ -1,14 +1,12 @@
 ﻿using Microsoft.Extensions.Logging;
+using ZLogger;
 
 namespace UpdateNotifier.Utilities;
 
 public sealed class Config
 {
-	private readonly ILogger<Config> _logger;
-
 	public Config(ILogger<Config> logger)
 	{
-		_logger = logger;
 		RssFeedUrl = Environment.GetEnvironmentVariable("RSS_FEED_URL") ?? @"https://f95zone.to/sam/latest_alpha/latest_data.php?cmd=rss&cat=games";
 		BotToken = Environment.GetEnvironmentVariable("DISCORD_BOT_TOKEN")
 		        ?? throw new InvalidOperationException("Bot token not found. Set the DISCORD_BOT_TOKEN environment variable.");
@@ -35,6 +33,8 @@ public sealed class Config
 			UpdateCheckInterval = TimeSpan.FromMinutes(minutes);
 		else
 			UpdateCheckInterval = TimeSpan.FromMinutes(5);
+		
+		logger.ZLogInformation($"Config: {this}");
 	}
 
 	public string   BotToken            { get; }

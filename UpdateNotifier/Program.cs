@@ -51,7 +51,7 @@ internal class Program
 						                                                                                       $"{ex.Message}"));
 			                                                       });
 		                         })
-		      .AddZLoggerRollingFile((options, provider) =>
+		      .AddZLoggerRollingFile(options =>
 		                             {
 			                             var logFolder = Environment.GetEnvironmentVariable("LOGS_FOLDER") ?? "/data/logs";
 			                             options.RollingInterval = RollingInterval.Day;
@@ -79,9 +79,8 @@ internal class Program
 	{
 		var discordConfig = new DiscordSocketConfig
 		{
-			GatewayIntents = GatewayIntents.DirectMessages | GatewayIntents.Guilds | GatewayIntents.GuildMembers,
+			GatewayIntents = GatewayIntents.DirectMessages | GatewayIntents.Guilds,
 			LogLevel = LogSeverity.Info,
-			AlwaysDownloadUsers = true,
 			MessageCacheSize = 1000,
 			DefaultRetryMode = RetryMode.AlwaysRetry,
 			MaxWaitBetweenGuildAvailablesBeforeReady = 3000,

@@ -25,7 +25,6 @@ public sealed class DataContext : DbContext
 	protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 	{
 		optionsBuilder.UseSqlite($"Data Source={_config.DatabasePath}");
-		_logger.ZLogInformation($"Database path: {_config.DatabasePath}");
 	}
 
 	protected override void OnModelCreating(ModelBuilder modelBuilder)

@@ -19,7 +19,6 @@ public class DiscordBotService(
 {
 	protected override async Task ExecuteAsync(CancellationToken stoppingToken)
 	{
-		logger.ZLogInformation($"Config: {config}");
 		client.Log += LogAsync;
 		interactionService.Log += LogAsync;
 
