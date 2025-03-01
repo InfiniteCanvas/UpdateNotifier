@@ -33,10 +33,11 @@ public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db
 			return;
 		}
 
-		if (!user.IsPrivileged() && dbUser.Games.Count >= 69)
+		if (!user.IsPrivileged() && dbUser.Games.Count >= 420)
 		{
-			await RespondAsync("Wanna keep track of more than 69 games? Support me on patreon!"
-			                 + " Or self-host an instance - instructions on github.",
+			await RespondAsync("Wanna keep track of more than 420 games? Why do you even keep track of that many?\n"
+			                 + "Support me on patreon (or wherever I setup, idk)!\n"
+			                 + "Or self-host an instance - https://github.com/InfiniteCanvas/UpdateNotifier",
 			                   ephemeral: true);
 			return;
 		}
