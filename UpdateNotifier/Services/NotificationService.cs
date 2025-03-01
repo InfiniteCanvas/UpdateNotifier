@@ -76,7 +76,7 @@ public sealed class NotificationService : BackgroundService
 		{
 			var notification = await _notificationQueue.Reader.ReadAsync(stoppingToken);
 			var user = await _client.GetUserAsync(notification.User.UserId, new RequestOptions { CancelToken = stoppingToken });
-			_logger.ZLogTrace($"Sending notification to {user.Username}: {notification.Message}");
+			_logger.ZLogInformation($"Sending notification to {user.Username}: {notification.Message}");
 			await user.SendMessageAsync(notification.Message, options: new RequestOptions { CancelToken = stoppingToken });
 		}
 	}
