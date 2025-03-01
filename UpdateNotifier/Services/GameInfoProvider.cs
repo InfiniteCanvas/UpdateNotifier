@@ -6,7 +6,7 @@ using ZLogger;
 
 namespace UpdateNotifier.Services;
 
-public partial class GameInfoService(ILogger<GameInfoService> logger, HttpClient httpClient)
+public partial class GameInfoProvider(ILogger<GameInfoProvider> logger, HttpClient httpClient)
 {
 	private const RegexOptions _DEFAULT_COMPILED_ONCE_OPTIONS = RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline;
 

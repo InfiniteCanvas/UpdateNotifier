@@ -110,6 +110,7 @@ internal class Program
 		                 .AddSingleton<RssMonitorService>()
 		                 .AddHostedService(provider => provider.GetRequiredService<RssMonitorService>())
 		                 .AddSingleton<DataContext>()
+		                 .AddSingleton<GameInfoProvider>()
 		                 .AddHttpClient();
 	}
 }

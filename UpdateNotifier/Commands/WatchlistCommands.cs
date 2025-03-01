@@ -11,7 +11,7 @@ using ZLogger;
 
 namespace UpdateNotifier.Commands;
 
-public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db, GameInfoService gameInfoService)
+public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db, GameInfoProvider gameInfoProvider)
 	: InteractionModuleBase<SocketInteractionContext>
 {
 	[SlashCommand("watch", "Watch a thread and get updates from it."), Alias("add")]
@@ -46,7 +46,7 @@ public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db
 			}
 			else
 			{
-				game = await db.Games.FindAsync(threadId) ?? await gameInfoService.GetGameInfo(url);
+				game = await db.Games.FindAsync(threadId) ?? await gameInfoProvider.GetGameInfo(url);
 				dbUser.Games.Add(game);
 				valid.Add(url);
 				logger.ZLogDebug($"Added {url} to watchlist of user {user.Id}");
