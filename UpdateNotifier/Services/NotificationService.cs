@@ -62,7 +62,6 @@ public sealed class NotificationService : BackgroundService
 	{
 		try
 		{
-			_logger.ZLogTrace($"Notifying {user}: {message}");
 			_notificationQueue.Writer.TryWrite(new Notification(user, message));
 		}
 		catch
