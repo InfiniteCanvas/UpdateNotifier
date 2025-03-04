@@ -7,16 +7,17 @@ public sealed class Config
 {
 	public Config(ILogger<Config> logger)
 	{
-		RssFeedUrl = Environment.GetEnvironmentVariable("RSS_FEED_URL") ?? @"https://f95zone.to/sam/latest_alpha/latest_data.php?cmd=rss&cat=games";
-		BotToken = Environment.GetEnvironmentVariable("DISCORD_BOT_TOKEN")
-		        ?? throw new InvalidOperationException("Bot token not found. Set the DISCORD_BOT_TOKEN environment variable.");
-		XfUser = Environment.GetEnvironmentVariable("XF_USER")       ?? string.Empty;
-		XfSession = Environment.GetEnvironmentVariable("XF_SESSION") ?? string.Empty;
+		RssFeedUrl = Environment.GetEnvironmentVariable("RSS_FEED_URL")    ?? @"https://f95zone.to/sam/latest_alpha/latest_data.php?cmd=rss&cat=games";
+		BotToken = Environment.GetEnvironmentVariable("DISCORD_BOT_TOKEN") ?? string.Empty;
+		XfUser = Environment.GetEnvironmentVariable("XF_USER")             ?? string.Empty;
+		XfSession = Environment.GetEnvironmentVariable("XF_SESSION")       ?? string.Empty;
 		IsProduction = Environment.GetEnvironmentVariable("ENVIRONMENT")?.ToLower() == "production";
 		SelfHosted = Environment.GetEnvironmentVariable("SELF_HOSTED")?.ToLower()   == "true";
 		DatabasePath = Environment.GetEnvironmentVariable("DATABASE_PATH") ?? "/data/app.db";
 		LogsFolderPath = Environment.GetEnvironmentVariable("LOGS_FOLDER") ?? "/data/logs";
 
+		if (string.IsNullOrEmpty(BotToken))
+			logger.ZLogCritical($"You need to set the DISCORD_BOT_TOKEN environment variable.");
 		var guildIdStr = Environment.GetEnvironmentVariable("DISCORD_GUILD_ID");
 		if (!string.IsNullOrEmpty(guildIdStr) && ulong.TryParse(guildIdStr, out var guildId))
 		{
@@ -25,7 +26,7 @@ public sealed class Config
 		else
 		{
 			if (!IsProduction)
-				throw new InvalidOperationException("No guild ID is provided for dev mode. Set the DISCORD_GUILD_ID environment variable.");
+				logger.ZLogCritical($"No guild ID is provided for dev mode. Set the DISCORD_GUILD_ID environment variable.");
 		}
 
 		var intervalStr = Environment.GetEnvironmentVariable("RSS_UPDATE_INTERVAL");
@@ -33,7 +34,7 @@ public sealed class Config
 			UpdateCheckInterval = TimeSpan.FromMinutes(minutes);
 		else
 			UpdateCheckInterval = TimeSpan.FromMinutes(5);
-		
+
 		logger.ZLogInformation($"Config: {this}");
 	}
 

@@ -4,14 +4,15 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace UpdateNotifier.Data.Models;
 
 [Table("Games")]
-public class Game : IComparable<Game>, IComparable, IEquatable<Game>
+public class Game(ulong gameId, string title, DateTime lastUpdated, string url)
+	: IComparable<Game>, IComparable, IEquatable<Game>
 {
-	[Key] public ulong GameId { get; set; }
+	[Key] public ulong GameId { get; init; } = gameId;
 
-	public             string     Title       { get; set; }
-	public             DateTime   LastUpdated { get; set; }
-	public             string     Url         { get; set; }
-	[NotMapped] public List<User> Watchers    { get; set; } = [];
+	[MaxLength(255)] public string     Title       { get; set; }  = title;
+	public                  DateTime   LastUpdated { get; set; }  = lastUpdated;
+	[MaxLength(255)] public string     Url         { get; init; } = url;
+	[NotMapped]      public List<User> Watchers    { get; set; }  = [];
 
 	public int CompareTo(object? obj)
 	{

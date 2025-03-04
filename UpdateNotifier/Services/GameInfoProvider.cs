@@ -42,7 +42,7 @@ public partial class GameInfoProvider(ILogger<GameInfoProvider> logger, IHttpCli
 			};
 			// just pray it works lmao
 			url.GetThreadId(out var gameId);
-			var game = new Game { Title = title, LastUpdated = DateTime.Parse(updated), Url = url, GameId = gameId };
+			var game = new Game(title: title, lastUpdated: DateTime.Parse(updated), url: url, gameId: gameId);
 			logger.ZLogDebug($"Getting info on {url}: {game}");
 			return game;
 		}

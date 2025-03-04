@@ -1,7 +1,10 @@
 ﻿using Discord;
 using Discord.Interactions;
+using Discord.WebSocket;
 using Microsoft.Extensions.Logging;
 using UpdateNotifier.Data;
+using UpdateNotifier.Data.Models;
+using UpdateNotifier.Utilities;
 using ZLogger;
 
 namespace UpdateNotifier.Commands;
@@ -180,5 +183,30 @@ public sealed class UserManagementCommands(ILogger<UserManagementCommands> logge
 		                   ],
 		                   ephemeral: true);
 		logger.ZLogDebug($"User {Context.User.GlobalName} declined deletion.");
+	}
+
+	[SlashCommand("get_hash", "Get the hash of the user.")]
+	public async Task GetHash()
+	{
+		var user = db.Find<User>(Context.User.Id);
+		if (user == null)
+		{
+			await RespondAsync("This user doesn't exist.", ephemeral: true);
+			return;
+		}
+
+		if (Context.User is not SocketGuildUser guildUser)
+		{
+			await RespondAsync("Something went wrong.", ephemeral: true);
+			return;
+		}
+
+		if (!guildUser.IsPrivileged())
+		{
+			await RespondAsync("You need to be a supporter to do this.", ephemeral: true);
+			return;
+		}
+
+		await RespondAsync($"Hash: {user.Hash}", ephemeral: true);
 	}
 }

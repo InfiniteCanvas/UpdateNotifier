@@ -1,17 +1,17 @@
 ﻿using System.Text;
+using Discord;
 using Discord.Commands;
 using Discord.Interactions;
 using Discord.WebSocket;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using UpdateNotifier.Data;
-using UpdateNotifier.Services;
 using UpdateNotifier.Utilities;
 using ZLogger;
 
 namespace UpdateNotifier.Commands;
 
-public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db, GameInfoProvider gameInfoProvider)
+public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db, IHttpClientFactory httpClientFactory)
 	: InteractionModuleBase<SocketInteractionContext>
 {
 	[SlashCommand("watch", "Watch a thread and get updates from it."), Alias("add")]
@@ -25,66 +25,33 @@ public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db
 			return;
 		}
 
-		var dbUser = db.Users.Include(u => u.Games).FirstOrDefault(u => u.UserId == user.Id);
-		if (dbUser == null)
+		var (_, response) = await db.AddGames(user.Id, user.IsPrivileged(), urls);
+		await RespondAsync(response, ephemeral: true);
+	}
+
+	[SlashCommand("import_watchlist", "Watch a thread and get updates from it.")]
+	public async Task ImportWatchlist(IAttachment attachment)
+	{
+		if (!attachment.ContentType.Contains("text/plain"))
 		{
-			logger.ZLogError($"User {user.Id} does not exist, aborting adding to watchlist.");
-			await RespondAsync("User not found. Use /enable first.", ephemeral: true);
+			logger.ZLogError($"Attachment is {attachment.ContentType}.");
+			await RespondAsync("Attached file is not a text file.", ephemeral: true);
 			return;
 		}
 
-		if (!user.IsPrivileged() && dbUser.Games.Count >= 420)
+		if (Context.User is not SocketGuildUser user)
 		{
-			await RespondAsync("Wanna keep track of more than 420 games? Why do you even keep track of that many?\n"
-			                 + "Support me on patreon (or wherever I setup, idk)!\n"
-			                 + "Or self-host an instance - https://github.com/InfiniteCanvas/UpdateNotifier",
-			                   ephemeral: true);
+			logger.ZLogError($"User is not a SocketGuildUser.");
+			await RespondAsync("Something went wrong.", ephemeral: true);
 			return;
 		}
 
-		var sanitizedUrls = urls.Select(url => url.GetSanitizedUrl(out var sanitizedUrl) ? sanitizedUrl : string.Empty)
-		                        .Where(s => !string.IsNullOrEmpty(s));
-		var valid = new List<string>();
-		var invalid = new List<string>();
-		foreach (var url in sanitizedUrls)
-		{
-			if (!url.GetThreadId(out var threadId))
-			{
-				logger.ZLogWarning($"Thread {threadId} is malformed, cannot parse.");
-				continue;
-			}
+		var client = httpClientFactory.CreateClient();
+		var urlsCombined = await client.GetStringAsync(attachment.Url);
+		var urls = urlsCombined.Split('\n');
 
-			var game = dbUser.Games.Find(g => g.GameId == threadId);
-			if (game != null)
-			{
-				invalid.Add(url);
-			}
-			else
-			{
-				game = await db.Games.FindAsync(threadId) ?? await gameInfoProvider.GetGameInfo(url);
-				dbUser.Games.Add(game);
-				valid.Add(url);
-				logger.ZLogDebug($"Added {url} to watchlist of user {user.Id}");
-			}
-		}
-
-		await db.SaveChangesAsync();
-
-		var builder = new StringBuilder();
-		if (valid.Count > 0)
-		{
-			builder.Append("Games added: ");
-			builder.AppendJoin(" ", valid);
-			builder.AppendLine();
-		}
-
-		if (invalid.Count > 0)
-		{
-			builder.Append("Games already in watchlist: ");
-			builder.AppendJoin(" ", invalid);
-		}
-
-		await RespondAsync(builder.ToString(), ephemeral: true);
+		var (_, response) = await db.AddGames(user.Id, user.IsPrivileged(), urls);
+		await RespondAsync(response, ephemeral: true);
 	}
 
 	[SlashCommand("unwatch", "Remove threads from the watchlist."), Alias("remove")]

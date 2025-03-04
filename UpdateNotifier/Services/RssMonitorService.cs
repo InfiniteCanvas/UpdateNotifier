@@ -102,7 +102,7 @@ public sealed class RssMonitorService(
 		{
 			if (!item.Id.GetSanitizedUrl(out var sanitizedUrl)) continue;
 			if (!sanitizedUrl.GetThreadId(out var threadId)) continue;
-			yield return new Game { Title = item.Title.Text.HtmlDecode(), Url = sanitizedUrl, LastUpdated = item.PublishDate.DateTime, GameId = threadId };
+			yield return new Game(title: item.Title.Text.HtmlDecode(), url: sanitizedUrl, lastUpdated: item.PublishDate.DateTime, gameId: threadId);
 		}
 	}
 }
