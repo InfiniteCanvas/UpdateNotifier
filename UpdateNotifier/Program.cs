@@ -41,43 +41,41 @@ internal class Program
 	}
 
 	private static void ConfigureWebHost(IWebHostBuilder builder)
-	{
-		builder.Configure(app =>
-		                  {
-			                  app.UseRouting();
-			                  app.UseEndpoints(endpoints =>
-			                                   {
-				                                   endpoints.MapPost("/api/v1/game", AddHandler)
-				                                            .WithName("AddGame")
-				                                            .WithTags("Game")
-				                                            .WithOpenApi(operation =>
-				                                                         {
-					                                                         operation.Summary = "Add game for tracking";
-					                                                         operation.Description = "Create a new watchlist entry for game tracking";
-					                                                         return operation;
-				                                                         });
-				                                   endpoints.MapGet("/api/v1/games", GetHandler)
-				                                            .WithName("GetIsWatched")
-				                                            .WithTags("Game")
-				                                            .WithOpenApi(operation =>
-				                                                         {
-					                                                         operation.Summary = "Get game tracking status";
-					                                                         operation.Description = "Get game tracking status";
-					                                                         return operation;
-				                                                         });
+		=> builder.Configure(app =>
+		                     {
+			                     app.UseRouting();
+			                     app.UseEndpoints(endpoints =>
+			                                      {
+				                                      endpoints.MapPost("/api/v1/game", AddHandler)
+				                                               .WithName("AddGame")
+				                                               .WithTags("Game")
+				                                               .WithOpenApi(operation =>
+				                                                            {
+					                                                            operation.Summary = "Add game for tracking";
+					                                                            operation.Description = "Create a new watchlist entry for game tracking";
+					                                                            return operation;
+				                                                            });
+				                                      endpoints.MapGet("/api/v1/games", GetHandler)
+				                                               .WithName("GetIsWatched")
+				                                               .WithTags("Game")
+				                                               .WithOpenApi(operation =>
+				                                                            {
+					                                                            operation.Summary = "Get game tracking status";
+					                                                            operation.Description = "Get game tracking status";
+					                                                            return operation;
+				                                                            });
 
-				                                   async Task GetHandler(HttpContext context)
-				                                   {
-					                                   throw new NotImplementedException(); 
-				                                   }
+				                                      async Task GetHandler(HttpContext context)
+				                                      {
+					                                      // db.Users.Find(u => u.Hash == user.Hash).Games.Where(g => g.Id == game.Id)
+				                                      }
 
-				                                   async Task AddHandler([FromBody] GameAddRequest addRequest, DataContext db)
-				                                   {
-					                                   // db.AddGame(addRequest)
-				                                   }
-			                                   });
-		                  });
-	}
+				                                      async Task AddHandler([FromBody] GameAddRequest addRequest, DataContext db)
+				                                      {
+					                                      // db.AddGame(addRequest)
+				                                      }
+			                                      });
+		                     });
 
 	private static void ConfigureLogging(ILoggingBuilder builder)
 		=> builder.ClearProviders()
@@ -166,14 +164,14 @@ internal class Program
 		                                (provider, client) =>
 		                                {
 			                                var config = provider.GetRequiredService<Config>();
-			                                client.BaseAddress = new Uri(config.RssFeedUrl);
+			                                client.BaseAddress = new Uri(Config.RSS_FEED_BASE);
 		                                })
 		                 .ConfigurePrimaryHttpMessageHandler(provider =>
 		                                                     {
 			                                                     var config = provider.GetRequiredService<Config>();
 			                                                     var handler = new HttpClientHandler { UseCookies = true, CookieContainer = new CookieContainer() };
-			                                                     handler.CookieContainer.Add(new Uri(config.RssFeedUrl), new Cookie("xf_user",    config.XfUser));
-			                                                     handler.CookieContainer.Add(new Uri(config.RssFeedUrl), new Cookie("xf_session", config.XfSession));
+			                                                     handler.CookieContainer.Add(new Uri(Config.RSS_FEED_BASE), new Cookie("xf_user",    config.XfUser));
+			                                                     handler.CookieContainer.Add(new Uri(Config.RSS_FEED_BASE), new Cookie("xf_session", config.XfSession));
 			                                                     return handler;
 		                                                     });
 	}

@@ -5,9 +5,20 @@ namespace UpdateNotifier.Utilities;
 
 public sealed class Config
 {
+	public const string RSS_FEED_BASE = "https://f95zone.to/";
+
 	public Config(ILogger<Config> logger)
 	{
-		RssFeedUrl = Environment.GetEnvironmentVariable("RSS_FEED_URL")    ?? @"https://f95zone.to/sam/latest_alpha/latest_data.php?cmd=rss&cat=games";
+		var urls = Environment.GetEnvironmentVariable("RSS_FEED_URLS");
+		if (!string.IsNullOrEmpty(urls)) RssFeedUrls = urls.Split(' ');
+		else
+			RssFeedUrls =
+			[
+				@"https://f95zone.to/sam/latest_alpha/latest_data.php?cmd=rss&cat=games",
+				@"https://f95zone.to/sam/latest_alpha/latest_data.php?cmd=rss&cat=animations",
+				@"https://f95zone.to/sam/latest_alpha/latest_data.php?cmd=rss&cat=comics",
+				@"https://f95zone.to/sam/latest_alpha/latest_data.php?cmd=rss&cat=assets",
+			];
 		BotToken = Environment.GetEnvironmentVariable("DISCORD_BOT_TOKEN") ?? string.Empty;
 		XfUser = Environment.GetEnvironmentVariable("XF_USER")             ?? string.Empty;
 		XfSession = Environment.GetEnvironmentVariable("XF_SESSION")       ?? string.Empty;
@@ -44,11 +55,11 @@ public sealed class Config
 	public bool     SelfHosted          { get; }
 	public string   DatabasePath        { get; }
 	public string   LogsFolderPath      { get; }
-	public string   RssFeedUrl          { get; }
+	public string[] RssFeedUrls         { get; }
 	public TimeSpan UpdateCheckInterval { get; }
 	public string   XfUser              { get; }
 	public string   XfSession           { get; }
 
 	public override string ToString()
-		=> $"{nameof(DatabasePath)}: {DatabasePath}, {nameof(LogsFolderPath)}: {LogsFolderPath}, {nameof(UpdateCheckInterval)}: {UpdateCheckInterval}, {nameof(RssFeedUrl)}: {RssFeedUrl}";
+		=> $"{nameof(DatabasePath)}: {DatabasePath}, {nameof(LogsFolderPath)}: {LogsFolderPath}, {nameof(UpdateCheckInterval)}: {UpdateCheckInterval}, {nameof(RssFeedUrls)}: {RssFeedUrls}";
 }

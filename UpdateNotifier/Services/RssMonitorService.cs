@@ -19,9 +19,9 @@ public sealed class RssMonitorService(
 	IHttpClientFactory         httpClientFactory)
 	: BackgroundService
 {
-	private readonly TimedSemaphore   _timedSemaphore = new(2, 2, TimeSpan.FromMinutes(1));
-	private          IDisposable      _disposable     = null!;
-	private          SyndicationFeed? _feed;
+	private readonly Queue<SyndicationFeed> _feeds          = new();
+	private readonly TimedSemaphore         _timedSemaphore = new(2, 2, TimeSpan.FromMinutes(1));
+	private          DisposableBag          _disposable;
 
 	public event Action<List<Game>>? GamesUpdatedEvent;
 
@@ -37,17 +37,30 @@ public sealed class RssMonitorService(
 		var bag = new DisposableBag(2);
 		bag.Add(Observable.Interval(config.UpdateCheckInterval, stoppingToken)
 		                  .TakeUntil(stoppingToken)
-		                  .SubscribeAwait(CheckFeedAndQueueNotification));
+		                  .SubscribeAwait(CheckFeedsAndQueueNotification));
 		_disposable = bag;
 		await Task.Delay(-1, stoppingToken);
 	}
 
-	private async ValueTask CheckFeedAndQueueNotification(Unit _, CancellationToken ct)
+	private async ValueTask CheckFeedsAndQueueNotification(Unit _, CancellationToken ct)
 	{
-		await _timedSemaphore.WaitAsync(ct);
-		logger.ZLogInformation($"RssMonitorService is checking the feed for updates.");
-		GetFeed().GetAwaiter().GetResult();
-		var feed = _feed == null ? [] : Transform(_feed).ToImmutableList();
+		logger.ZLogInformation($"RssMonitorService is checking the feeds for updates.");
+		await GetFeed(ct);
+
+		while (_feeds.TryDequeue(out var rawFeed))
+			try
+			{
+				await CheckFeed(ct, rawFeed);
+			}
+			catch (Exception e)
+			{
+				logger.ZLogError(e, $"RssMonitorService failed checking this feed: {rawFeed}");
+			}
+	}
+
+	private async Task CheckFeed(CancellationToken ct, SyndicationFeed rawFeed)
+	{
+		var feed = Transform(rawFeed).ToImmutableList();
 		// to list so we actually fetch the query
 		var toCheck = db.Games.Include(g => g.Watchers).Where(dbGame => feed.Contains(dbGame)).ToImmutableList();
 		logger.ZLogTrace($"To Check: {toCheck}");
@@ -80,18 +93,23 @@ public sealed class RssMonitorService(
 		await db.SaveChangesAsync(ct);
 	}
 
-	private async Task GetFeed()
+	private async Task GetFeed(CancellationToken ct)
 	{
-		try
+		var client = httpClientFactory.CreateClient("RssFeed");
+		foreach (var feedUrl in config.RssFeedUrls)
 		{
-			var client = httpClientFactory.CreateClient("RssFeed");
-			await using var stream = await client.GetStreamAsync(config.RssFeedUrl);
-			using var reader = XmlReader.Create(stream);
-			_feed = SyndicationFeed.Load(reader);
-		}
-		catch (Exception e)
-		{
-			logger.ZLogError(e, $"Failed to load RSS feed.");
+			await _timedSemaphore.WaitAsync(ct);
+			try
+			{
+				await using var stream = await client.GetStreamAsync(feedUrl, ct);
+				using var reader = XmlReader.Create(stream);
+				_feeds.Enqueue(SyndicationFeed.Load(reader));
+				logger.ZLogInformation($"RSS feed queued for updates: {feedUrl}");
+			}
+			catch (Exception e)
+			{
+				logger.ZLogError(e, $"Failed to load RSS feed. [{feedUrl}]");
+			}
 		}
 	}
 

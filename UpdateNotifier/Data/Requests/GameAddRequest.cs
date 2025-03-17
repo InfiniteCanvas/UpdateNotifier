@@ -2,8 +2,8 @@
 
 public class GameAddRequest
 {
-	public string   ThreadUrl;
-	public string   ThreadTitle;
 	public DateTime LastUpdate;
+	public string   ThreadTitle;
+	public string   ThreadUrl;
 	public ulong    UserHash;
 }

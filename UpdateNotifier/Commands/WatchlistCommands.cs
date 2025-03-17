@@ -9,6 +9,8 @@ using UpdateNotifier.Data;
 using UpdateNotifier.Utilities;
 using ZLogger;
 
+// ReSharper disable UnusedMember.Global
+
 namespace UpdateNotifier.Commands;
 
 public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db, IHttpClientFactory httpClientFactory)
