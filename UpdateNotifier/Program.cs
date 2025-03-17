@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -37,6 +38,13 @@ internal class Program
 		                                     })
 		               .ConfigureWebHostDefaults(ConfigureWebHost)
 		               .Build();
+
+		using (var scope = host.Services.CreateScope())
+		{
+			var db = scope.ServiceProvider.GetRequiredService<DataContext>();
+			await db.Database.MigrateAsync();
+		}
+
 		await host.RunAsync();
 	}
 
