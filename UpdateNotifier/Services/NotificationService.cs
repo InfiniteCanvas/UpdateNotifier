@@ -45,10 +45,12 @@ public sealed class NotificationService : BackgroundService
 		foreach (var update in updates)
 		{
 			foreach (var watcher in update.Watchers)
+			{
 				if (notifications.TryGetValue(watcher, out var games))
 					games.Add(update);
 				else
 					notifications.Add(watcher, [update]);
+			}
 		}
 
 		foreach (var notification in notifications)

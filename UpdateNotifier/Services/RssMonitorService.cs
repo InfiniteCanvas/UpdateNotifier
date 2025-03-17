@@ -20,7 +20,7 @@ public sealed class RssMonitorService(
 	: BackgroundService
 {
 	private readonly Queue<SyndicationFeed> _feeds          = new();
-	private readonly TimedSemaphore         _timedSemaphore = new(2, 2, TimeSpan.FromMinutes(1));
+	private readonly TimedSemaphore         _timedSemaphore = new(4, 4, TimeSpan.FromMinutes(1));
 	private          DisposableBag          _disposable;
 
 	public event Action<List<Game>>? GamesUpdatedEvent;
@@ -48,23 +48,26 @@ public sealed class RssMonitorService(
 		await GetFeed(ct);
 
 		while (_feeds.TryDequeue(out var rawFeed))
+		{
 			try
 			{
-				await CheckFeed(ct, rawFeed);
+				await CheckFeed(rawFeed, ct);
 			}
 			catch (Exception e)
 			{
 				logger.ZLogError(e, $"RssMonitorService failed checking this feed: {rawFeed}");
 			}
+		}
 	}
 
-	private async Task CheckFeed(CancellationToken ct, SyndicationFeed rawFeed)
+	private async Task CheckFeed(SyndicationFeed rawFeed, CancellationToken ct)
 	{
 		var feed = Transform(rawFeed).ToImmutableList();
 		// to list so we actually fetch the query
 		var toCheck = db.Games.Include(g => g.Watchers).Where(dbGame => feed.Contains(dbGame)).ToImmutableList();
 		logger.ZLogTrace($"To Check: {toCheck}");
 		var toAdd = feed.Except(toCheck).ToImmutableList();
+		logger.ZLogTrace($"To Add: {toAdd}");
 		var toUpdate = new List<Game>();
 
 		foreach (var dbGame in toCheck)
@@ -89,6 +92,8 @@ public sealed class RssMonitorService(
 
 			GamesUpdatedEvent?.Invoke(toUpdate);
 		}
+
+		logger.ZLogTrace($"To Update: {toUpdate}");
 
 		await db.SaveChangesAsync(ct);
 	}

@@ -17,8 +17,8 @@ public class Result<TSource>(ResultStatus status, TSource item, Exception? excep
 	public override string ToString()
 		=> Exception switch
 		{
-			not null => $"{nameof(Status)}: {Status}\n{Exception}: {nameof(Exception)}",
-			null     => $"{nameof(Status)}: {Status}",
+			{ }  => $"{nameof(Status)}: {Status}\n{Exception}: {nameof(Exception)}",
+			null => $"{nameof(Status)}: {Status}",
 		};
 
 	public static Result<TSource> Failure(Exception? exception = default, TSource resultItem = default) => new(ResultStatus.Failure, resultItem, exception);

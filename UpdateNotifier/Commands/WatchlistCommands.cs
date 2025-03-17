@@ -27,8 +27,16 @@ public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db
 			return;
 		}
 
-		var (_, response) = await db.AddGames(user.Id, user.IsPrivileged(), urls);
-		await RespondAsync(response, ephemeral: true);
+		try
+		{
+			var (_, response) = await db.AddGames(user.Id, user.IsPrivileged(), urls);
+			await RespondAsync(response, ephemeral: true);
+		}
+		catch (Exception e)
+		{
+			logger.ZLogError(e, $"[{e.GetType()}]Failed to add games {urlsCombined}");
+			await RespondAsync($"Something went wrong trying to add:\n{urlsCombined}", ephemeral: true);
+		}
 	}
 
 	[SlashCommand("import_watchlist", "Watch a thread and get updates from it.")]

@@ -9,26 +9,16 @@ using ZLogger;
 
 namespace UpdateNotifier.Data;
 
-public sealed class DataContext : DbContext
+public sealed class DataContext(ILogger<DataContext> logger, Config config, GameInfoProvider gameInfoProvider) : DbContext
 {
-	private readonly Config               _config;
-	private readonly GameInfoProvider     _gameInfoProvider;
-	private readonly ILogger<DataContext> _logger;
-
-	public DataContext(ILogger<DataContext> logger, Config config, GameInfoProvider gameInfoProvider)
-	{
-		_logger = logger;
-		_config = config;
-		_gameInfoProvider = gameInfoProvider;
-		Database.Migrate();
-	}
-
 	public DbSet<User>           Users     => Set<User>();
 	public DbSet<Game>           Games     => Set<Game>();
 	public DbSet<WatchlistEntry> Watchlist => Set<WatchlistEntry>();
 
 	protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-		=> optionsBuilder.UseSqlite($"Data Source={_config.DatabasePath}").AddInterceptors(new HashInterceptor());
+	{
+		optionsBuilder.UseSqlite($"Data Source={config.DatabasePath}").AddInterceptors(new HashInterceptor());
+	}
 
 	protected override void OnModelCreating(ModelBuilder modelBuilder)
 	{
@@ -52,7 +42,7 @@ public sealed class DataContext : DbContext
 		{
 			if (UserExists(userId))
 			{
-				_logger.ZLogTrace($"User {userId} already exists in database");
+				logger.ZLogTrace($"User {userId} already exists in database");
 				return true;
 			}
 
@@ -61,12 +51,12 @@ public sealed class DataContext : DbContext
 			Users.Add(user);
 			SaveChanges();
 
-			_logger.ZLogInformation($"User {userId} has been added to database");
+			logger.ZLogInformation($"User {userId} has been added to database");
 			return true;
 		}
 		catch (Exception e)
 		{
-			_logger.ZLogError(e, $"Error adding user {userId} to database");
+			logger.ZLogError(e, $"Error adding user {userId} to database");
 			return false;
 		}
 	}
@@ -78,35 +68,36 @@ public sealed class DataContext : DbContext
 			var user = Users.FirstOrDefault(u => u.UserId == userId);
 			if (user == null)
 			{
-				_logger.ZLogTrace($"User {userId} does not exist in database");
+				logger.ZLogTrace($"User {userId} does not exist in database");
 				// return true here since user deletion was the goal and user does not exist
 				return true;
 			}
 
 			Users.Remove(user);
 			SaveChangesAsync();
-			_logger.ZLogInformation($"User {userId} has been removed from database");
+			logger.ZLogInformation($"User {userId} has been removed from database");
 			return true;
 		}
 		catch (Exception e)
 		{
-			_logger.ZLogError(e, $"Error removing user {userId} from database");
+			logger.ZLogError(e, $"Error removing user {userId} from database");
 			return false;
 		}
 	}
 
 
-	public async Task<(bool success, string response)> AddGames(ulong userId, bool privileged, string[] urls)
+	public async Task<(bool success, string response)> AddGames(ulong userId, bool privileged, string[] urls, CancellationToken ct = default)
 	{
-		var dbUser = Users.Include(u => u.Games).FirstOrDefault(u => u.UserId == userId);
-		if (dbUser == null)
+		var userExists = await Users.AnyAsync(u => u.UserId == userId, ct);
+		if (!userExists)
 		{
-			_logger.ZLogError($"User {userId} does not exist, aborting adding to watchlist.");
+			logger.ZLogError($"User {userId} does not exist, aborting adding to watchlist.");
 			return (false, "User not found. Use /enable first.");
 		}
 
-		if (!privileged && dbUser.Games.Count + urls.Length >= 420)
-			return (false, $"You have {dbUser.Games.Count} games  tracked and want to add {urls.Length} to the watchlist\n"
+		var gamesCount = await Watchlist.CountAsync(w => w.UserId == userId, ct);
+		if (!privileged && gamesCount + urls.Length >= 420)
+			return (false, $"You have {gamesCount} games  tracked and want to add {urls.Length} to the watchlist\n"
 			             + $"Wanna keep track of more than 420 games? Why do you even keep track of that many?\n"
 			             + "Support me on patreon (or wherever I setup, idk)!\n"
 			             + "Or self-host an instance - https://github.com/InfiniteCanvas/UpdateNotifier");
@@ -115,31 +106,57 @@ public sealed class DataContext : DbContext
 		                        .Where(s => !string.IsNullOrEmpty(s));
 		var valid = new List<string>();
 		var invalid = new List<string>();
+		var errors = new List<string>();
 		foreach (var url in sanitizedUrls)
 		{
 			if (!url.GetThreadId(out var threadId))
 			{
-				_logger.ZLogWarning($"Thread {threadId} is malformed, cannot parse.");
+				logger.ZLogWarning($"Thread {threadId} is malformed, cannot parse.");
 				continue;
 			}
 
-			var game = dbUser.Games.Find(g => g.GameId == threadId);
-			if (game != null)
+			await using var transaction = await Database.BeginTransactionAsync(ct);
+			try
 			{
-				invalid.Add(url);
+				var exists = await Games.AnyAsync(g => g.GameId == threadId, ct);
+
+				if (!exists)
+				{
+					var gameInfo = await gameInfoProvider.GetGameInfo(url);
+					await Games.AddAsync(gameInfo, ct);
+					await SaveChangesAsync(ct);
+				}
+
+				// I should change to use Watchlist instead of changing the user's Games list
+				// the nav prop is not tracked, so it's causing problems
+				if (!await Watchlist.AnyAsync(w => w.UserId == userId && w.GameId == threadId, ct))
+				{
+					Watchlist.Add(new WatchlistEntry { UserId = userId, GameId = threadId });
+					await SaveChangesAsync(ct);
+					valid.Add(url);
+				}
+				else
+				{
+					invalid.Add(url);
+				}
+
+				await transaction.CommitAsync(ct);
 			}
-			else
+			catch (DbUpdateConcurrencyException e)
 			{
-				game = await Games.FindAsync(threadId) ?? await _gameInfoProvider.GetGameInfo(url);
-				dbUser.Games.Add(game);
-				valid.Add(url);
-				_logger.ZLogDebug($"Added {url} to watchlist of user {userId}");
+				await transaction.RollbackAsync(ct);
+				logger.ZLogError(e, $"Error adding game {url} to watchlist");
+				errors.Add(url);
 			}
 		}
 
-		await SaveChangesAsync();
-
 		var builder = new StringBuilder();
+		if (errors.Any())
+		{
+			builder.AppendLine("There were errors during adding to watchlist:");
+			builder.AppendJoin("\n", errors);
+		}
+
 		if (valid.Count > 0)
 		{
 			builder.Append("Games added: ");
@@ -153,8 +170,6 @@ public sealed class DataContext : DbContext
 			builder.AppendJoin(" ", invalid);
 		}
 
-		var text = builder.ToString();
-
-		return (true, text);
+		return errors.Any() ? (false, builder.ToString()) : (true, builder.ToString());
 	}
 }
