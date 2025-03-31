@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Collections.Immutable;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using UpdateNotifier.Data.Functions;
@@ -169,5 +170,37 @@ public sealed class DataContext(ILogger<DataContext> logger, Config config, Game
 		}
 
 		return errors.Any() ? (false, builder.ToString()) : (true, builder.ToString());
+	}
+
+	public async Task<(bool success, string response)> RemoveGames(ulong userId, bool privileged, string[] urls, CancellationToken ct = default)
+	{
+		var userExists = await Users.AnyAsync(u => u.UserId == userId, ct);
+		if (!userExists)
+		{
+			logger.ZLogError($"User {userId} does not exist, aborting adding to watchlist.");
+			return (false, "User not found. Use /enable first.");
+		}
+
+		var sanitizedUrls = urls.Select(url => url.GetSanitizedUrl(out var sanitizedUrl) ? sanitizedUrl : string.Empty)
+		                        .Where(s => !string.IsNullOrEmpty(s))
+		                        .ToImmutableArray();
+		var threadIds = sanitizedUrls.Where(url => url.GetThreadId(out _))
+		                             .Select(url =>
+		                                     {
+			                                     url.GetThreadId(out var threadId);
+			                                     return threadId;
+		                                     })
+		                             .ToImmutableArray();
+		var watchlistEntries = Watchlist.Where(entry => entry.UserId == userId && threadIds.Contains(entry.GameId));
+
+		if (!watchlistEntries.Any()) return (true, "No games on the watchlist found to remove.");
+
+		await using var transaction = await Database.BeginTransactionAsync(ct);
+
+		Watchlist.RemoveRange(watchlistEntries);
+
+		await transaction.CommitAsync(ct);
+
+		return (true, $"Successfully removed these games from watchlist: {string.Join(' ', sanitizedUrls)}");
 	}
 }

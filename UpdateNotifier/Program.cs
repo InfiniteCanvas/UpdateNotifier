@@ -30,6 +30,7 @@ internal class Program
 	private static async Task Main(string[] args)
 	{
 		var host = Host.CreateDefaultBuilder(args)
+		               .UseDefaultServiceProvider(options => options.ValidateOnBuild = true)
 		               .ConfigureServices(ConfigureServices)
 		               .ConfigureLogging(ConfigureLogging)
 		               .ConfigureHostOptions(options =>
@@ -69,6 +70,17 @@ internal class Program
 		                      {
 			                      operation.Summary = "Add game for tracking";
 			                      operation.Description = "Create a new watchlist entry for game tracking";
+			                      return operation;
+		                      });
+		endpoints.MapDelete("/api/v1/games",
+		                    async ([FromBody] GameAddRequest addRequest, IEndpointHandlerService handlerService, CancellationToken ct)
+			                    => await handlerService.RemoveGameAsync(addRequest, ct))
+		         .WithName("RemoveGame")
+		         .WithTags("Game")
+		         .WithOpenApi(operation =>
+		                      {
+			                      operation.Summary = "Remove game from tracking";
+			                      operation.Description = "Remove a watchlist entry from game tracking";
 			                      return operation;
 		                      });
 		endpoints.MapGet("/api/v1/games",

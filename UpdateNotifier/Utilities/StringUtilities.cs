@@ -25,12 +25,12 @@ public static partial class StringUtilities
 		}
 	}
 
-	public static IEnumerable<Result<Match>> GetThreadPatternMatches(this string url)
+	public static List<Result<Match?>> GetThreadPatternMatches(this string url)
 	{
 		var matches = ThreadRegex().Matches(url);
 		return matches.Count switch
 		{
-			> 0 => matches.Select(match => match.Success ? new Result<Match>(ResultStatus.Success, match) : Result<Match>.Failure())
+			> 0 => matches.Select(match => match.Success ? new Result<Match?>(ResultStatus.Success, match) : Result<Match>.Failure())
 			              .ToList(),
 			_ => [],
 		};

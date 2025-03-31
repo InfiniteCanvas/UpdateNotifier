@@ -55,7 +55,7 @@ public class PrivilegeCheckerService(Config config, ILogger<PrivilegeCheckerServ
 			await restClient.LoginAsync(TokenType.Bot, config.BotToken);
 		_guild = await restClient.GetGuildAsync(config.GuildId);
 		logger.ZLogInformation($"Connected to server[{config.GuildId}]: {_guild.Name}");
-		logger.ZLogInformation($"Privileged role ids: {config.PrivilegedRoleIds}");
+		logger.ZLogInformation($"Privileged role ids: {string.Join(' ', config.PrivilegedRoleIds)}");
 
 		await Task.Delay(-1, stoppingToken);
 	}

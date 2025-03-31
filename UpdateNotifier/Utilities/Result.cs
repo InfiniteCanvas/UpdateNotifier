@@ -3,7 +3,7 @@
 public class Result<TSource>(ResultStatus status, TSource item, Exception? exception = null)
 {
 	public readonly Exception?   Exception = exception;
-	public readonly TSource      Item      = item;
+	public readonly TSource?     Item      = item;
 	public readonly ResultStatus Status    = status;
 
 	public bool IsSuccess => Status == ResultStatus.Success;
@@ -21,7 +21,7 @@ public class Result<TSource>(ResultStatus status, TSource item, Exception? excep
 			null => $"{nameof(Status)}: {Status}",
 		};
 
-	public static Result<TSource> Failure(Exception? exception = default, TSource resultItem = default) => new(ResultStatus.Failure, resultItem, exception);
+	public static Result<TSource?> Failure(Exception? exception = null, TSource? resultItem = default) => new(ResultStatus.Failure, resultItem, exception);
 
 	public static Result<TSource> Success(TSource resultItem) => new(ResultStatus.Success, resultItem);
 }
