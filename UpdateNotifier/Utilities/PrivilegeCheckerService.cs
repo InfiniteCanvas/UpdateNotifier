@@ -11,7 +11,12 @@ public class PrivilegeCheckerService(Config config, ILogger<PrivilegeCheckerServ
 {
 	private RestGuild? _guild;
 
-	public bool IsPrivileged(SocketGuildUser user) => config.SelfHosted || user.Roles.Any(r => config.PrivilegedRoleIds.Contains(r.Id));
+	public bool IsPrivileged(SocketGuildUser user)
+		=> config.SelfHosted
+		|| user.GuildPermissions.Administrator
+		|| user.GuildPermissions.ManageRoles
+		|| user.GuildPermissions.ModerateMembers
+		|| user.Roles.Any(r => config.PrivilegedRoleIds.Contains(r.Id));
 
 	// make it cache privileged userIds in db later
 	public async ValueTask<bool> IsPrivileged(ulong userId)
@@ -50,6 +55,7 @@ public class PrivilegeCheckerService(Config config, ILogger<PrivilegeCheckerServ
 			await restClient.LoginAsync(TokenType.Bot, config.BotToken);
 		_guild = await restClient.GetGuildAsync(config.GuildId);
 		logger.ZLogInformation($"Connected to server[{config.GuildId}]: {_guild.Name}");
+		logger.ZLogInformation($"Privileged role ids: {config.PrivilegedRoleIds}");
 
 		await Task.Delay(-1, stoppingToken);
 	}

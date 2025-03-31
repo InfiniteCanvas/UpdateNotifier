@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Discord;
+using Discord.WebSocket;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using UpdateNotifier.Data;
@@ -15,7 +17,8 @@ public interface IEndpointHandlerService
 	public ValueTask<IResult> GetWatchedGamesAsync(string userHash, CancellationToken ct = default);
 }
 
-public class EndpointHandlerService(DataContext db, ILogger<EndpointHandlerService> logger, PrivilegeCheckerService privilegeCheckerService) : IEndpointHandlerService
+public class EndpointHandlerService(DataContext db, ILogger<EndpointHandlerService> logger, PrivilegeCheckerService privilegeCheckerService, DiscordSocketClient client)
+	: IEndpointHandlerService
 {
 	public async ValueTask<IResult> AddGameAsync(GameAddRequest request, CancellationToken ct = default)
 	{
@@ -28,6 +31,13 @@ public class EndpointHandlerService(DataContext db, ILogger<EndpointHandlerServi
 		}
 
 		var (success, response) = await db.AddGames(user.UserId, await privilegeCheckerService.IsPrivileged(user.UserId), [request.ThreadUrl], ct);
+
+		if (!request.DiscordNotification) return success ? Results.Ok(response) : Results.BadRequest(response);
+
+		logger.ZLogDebug($"Success [{success}]: {response}");
+		var discordUser = await client.GetUserAsync(user.UserId);
+		await discordUser.SendMessageAsync(response);
+
 		return success ? Results.Ok(response) : Results.BadRequest(response);
 	}
 

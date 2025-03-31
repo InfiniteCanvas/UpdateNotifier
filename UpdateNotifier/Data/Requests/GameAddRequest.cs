@@ -2,8 +2,9 @@
 
 public class GameAddRequest
 {
-	public string ThreadUrl { get; set; }
-	public string UserHash  { get; set; }
+	public string ThreadUrl           { get; set; }
+	public string UserHash            { get; set; }
+	public bool   DiscordNotification { get; set; }
 
 	public override string ToString() => $"{nameof(ThreadUrl)}: {ThreadUrl}, {nameof(UserHash)}: {UserHash}";
 }
