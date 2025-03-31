@@ -10,7 +10,7 @@ public sealed class Config
 	public Config(ILogger<Config> logger)
 	{
 		var urls = Environment.GetEnvironmentVariable("RSS_FEED_URLS");
-		if (!string.IsNullOrEmpty(urls)) RssFeedUrls = urls.Split(' ');
+		if (!string.IsNullOrEmpty(urls)) RssFeedUrls = urls.Split(',');
 		else
 			RssFeedUrls =
 			[
@@ -36,6 +36,8 @@ public sealed class Config
 		}
 		else
 		{
+			logger.ZLogWarning($"DISCORD_GUILD_ID environment variable is set to 1020305112368955402 as default.");
+			GuildId = 1020305112368955402;
 			if (!IsProduction)
 				logger.ZLogCritical($"No guild ID is provided for dev mode. Set the DISCORD_GUILD_ID environment variable.");
 		}
@@ -46,11 +48,17 @@ public sealed class Config
 		else
 			UpdateCheckInterval = TimeSpan.FromMinutes(5);
 
+		var privilegesStr = Environment.GetEnvironmentVariable("PRIVILEGED_ROLE_IDS");
+		if (!string.IsNullOrEmpty(privilegesStr))
+			PrivilegedRoleIds = privilegesStr.Split(',').Where(s => ulong.TryParse(s, out _)).Select(ulong.Parse).ToArray();
+		else
+			PrivilegedRoleIds = [1345449839801925692, 1021813826938748979];
+
 		logger.ZLogInformation($"Config: {this}");
 	}
 
 	public string   BotToken            { get; }
-	public ulong?   GuildId             { get; }
+	public ulong    GuildId             { get; }
 	public bool     IsProduction        { get; }
 	public bool     SelfHosted          { get; }
 	public string   DatabasePath        { get; }
@@ -59,6 +67,7 @@ public sealed class Config
 	public TimeSpan UpdateCheckInterval { get; }
 	public string   XfUser              { get; }
 	public string   XfSession           { get; }
+	public ulong[]  PrivilegedRoleIds   { get; }
 
 	public override string ToString()
 		=> $"{nameof(DatabasePath)}: {DatabasePath}, {nameof(LogsFolderPath)}: {LogsFolderPath}, {nameof(UpdateCheckInterval)}: {UpdateCheckInterval}, {nameof(RssFeedUrls)}: {RssFeedUrls}";

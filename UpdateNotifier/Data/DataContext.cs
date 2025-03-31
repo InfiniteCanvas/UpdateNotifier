@@ -16,9 +16,7 @@ public sealed class DataContext(ILogger<DataContext> logger, Config config, Game
 	public DbSet<WatchlistEntry> Watchlist => Set<WatchlistEntry>();
 
 	protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-	{
-		optionsBuilder.UseSqlite($"Data Source={config.DatabasePath}").AddInterceptors(new HashInterceptor());
-	}
+		=> optionsBuilder.UseSqlite($"Data Source={config.DatabasePath}").AddInterceptors(new HashInterceptor());
 
 	protected override void OnModelCreating(ModelBuilder modelBuilder)
 	{

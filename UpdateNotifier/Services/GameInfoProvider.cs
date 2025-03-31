@@ -12,7 +12,6 @@ public partial class GameInfoProvider(ILogger<GameInfoProvider> logger, IHttpCli
 	private const RegexOptions _DEFAULT_COMPILED_ONCE_OPTIONS = RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline;
 
 	private readonly SemaphoreSlim _semaphoreSlim = new(5, 5);
-	private readonly Regex         _title         = TitleRegex();
 	private readonly Regex         _updated       = UpdatedRegex();
 
 	public void Dispose()
@@ -20,9 +19,6 @@ public partial class GameInfoProvider(ILogger<GameInfoProvider> logger, IHttpCli
 		_semaphoreSlim.Dispose();
 		GC.SuppressFinalize(this);
 	}
-
-	[GeneratedRegex(@"<title>(.*) ?\| F95zone<\/title>", _DEFAULT_COMPILED_ONCE_OPTIONS, "en-US")]
-	private static partial Regex TitleRegex();
 
 	[GeneratedRegex(@"<b>([Tt]hread)*.[Uu]pdated?[<\/b>: ]+([0-9-]+)<br", _DEFAULT_COMPILED_ONCE_OPTIONS, "en-US")]
 	private static partial Regex UpdatedRegex();

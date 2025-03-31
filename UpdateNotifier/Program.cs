@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using System.Text.Json.Serialization;
 using Discord;
 using Discord.Interactions;
 using Discord.Rest;
@@ -7,6 +8,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -19,6 +21,7 @@ using UpdateNotifier.Utilities;
 using Utf8StringInterpolation;
 using ZLogger;
 using ZLogger.Providers;
+using JsonOptions = Microsoft.AspNetCore.Http.Json.JsonOptions;
 
 namespace UpdateNotifier;
 
@@ -52,38 +55,34 @@ internal class Program
 		=> builder.Configure(app =>
 		                     {
 			                     app.UseRouting();
-			                     app.UseEndpoints(endpoints =>
-			                                      {
-				                                      endpoints.MapPost("/api/v1/game", AddHandler)
-				                                               .WithName("AddGame")
-				                                               .WithTags("Game")
-				                                               .WithOpenApi(operation =>
-				                                                            {
-					                                                            operation.Summary = "Add game for tracking";
-					                                                            operation.Description = "Create a new watchlist entry for game tracking";
-					                                                            return operation;
-				                                                            });
-				                                      endpoints.MapGet("/api/v1/games", GetHandler)
-				                                               .WithName("GetIsWatched")
-				                                               .WithTags("Game")
-				                                               .WithOpenApi(operation =>
-				                                                            {
-					                                                            operation.Summary = "Get game tracking status";
-					                                                            operation.Description = "Get game tracking status";
-					                                                            return operation;
-				                                                            });
-
-				                                      async Task GetHandler(HttpContext context)
-				                                      {
-					                                      // db.Users.Find(u => u.Hash == user.Hash).Games.Where(g => g.Id == game.Id)
-				                                      }
-
-				                                      async Task AddHandler([FromBody] GameAddRequest addRequest, DataContext db)
-				                                      {
-					                                      // db.AddGame(addRequest)
-				                                      }
-			                                      });
+			                     app.UseEndpoints(ConfigureEndPoints);
 		                     });
+
+	private static void ConfigureEndPoints(IEndpointRouteBuilder endpoints)
+	{
+		endpoints.MapPost("/api/v1/games",
+		                  async ([FromBody] GameAddRequest addRequest, IEndpointHandlerService handlerService, CancellationToken ct)
+			                  => await handlerService.AddGameAsync(addRequest, ct))
+		         .WithName("AddGame")
+		         .WithTags("Game")
+		         .WithOpenApi(operation =>
+		                      {
+			                      operation.Summary = "Add game for tracking";
+			                      operation.Description = "Create a new watchlist entry for game tracking";
+			                      return operation;
+		                      });
+		endpoints.MapGet("/api/v1/games",
+		                 async ([FromQuery] string userHash, IEndpointHandlerService handlerService, CancellationToken ct)
+			                 => await handlerService.GetWatchedGamesAsync(userHash, ct))
+		         .WithName("GetIsWatched")
+		         .WithTags("Game")
+		         .WithOpenApi(operation =>
+		                      {
+			                      operation.Summary = "Get game tracking status";
+			                      operation.Description = "Get game tracking status";
+			                      return operation;
+		                      });
+	}
 
 	private static void ConfigureLogging(ILoggingBuilder builder)
 		=> builder.ClearProviders()
@@ -133,6 +132,11 @@ internal class Program
 		                             {
 			                             options.ShouldInclude = description => description.RelativePath != null && description.RelativePath.StartsWith("/api/v1/game");
 		                             });
+		serviceCollection.Configure<JsonOptions>(options =>
+		                                         {
+			                                         options.SerializerOptions.ReferenceHandler =
+				                                         ReferenceHandler.IgnoreCycles;
+		                                         });
 
 		var discordConfig = new DiscordSocketConfig
 		{
@@ -160,6 +164,9 @@ internal class Program
 		                 .AddSingleton(provider => new InteractionService(provider.GetRequiredService<DiscordSocketClient>(),
 		                                                                  provider.GetRequiredService<InteractionServiceConfig>()))
 		                 .AddSingleton<Config>()
+		                 .AddSingleton<PrivilegeCheckerService>()
+		                 .AddHostedService(provider => provider.GetRequiredService<PrivilegeCheckerService>())
+		                 .AddSingleton<IEndpointHandlerService, EndpointHandlerService>()
 		                 .AddSingleton<CommandHandler>()
 		                 .AddHostedService<DiscordBotService>()
 		                 .AddSingleton<NotificationService>()

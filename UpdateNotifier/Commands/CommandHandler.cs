@@ -33,15 +33,8 @@ public sealed class CommandHandler(
 			else
 			{
 				// Register commands to a specific guild for faster testing during development
-				if (config.GuildId.HasValue)
-				{
-					await interactionService.RegisterCommandsToGuildAsync(config.GuildId.Value);
-					logger.ZLogInformation($"Registered commands to guild {config.GuildId.Value}");
-				}
-				else
-				{
-					logger.ZLogWarning($"No guild ID specified for development. Commands not registered.");
-				}
+				await interactionService.RegisterCommandsToGuildAsync(config.GuildId);
+				logger.ZLogInformation($"Registered commands to guild {config.GuildId}");
 			}
 		}
 		catch (Exception e)

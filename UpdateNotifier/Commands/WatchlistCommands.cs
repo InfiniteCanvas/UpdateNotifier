@@ -13,7 +13,7 @@ using ZLogger;
 
 namespace UpdateNotifier.Commands;
 
-public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db, IHttpClientFactory httpClientFactory)
+public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db, IHttpClientFactory httpClientFactory, PrivilegeCheckerService privilegeCheckerService)
 	: InteractionModuleBase<SocketInteractionContext>
 {
 	[SlashCommand("watch", "Watch a thread and get updates from it."), Alias("add")]
@@ -29,7 +29,7 @@ public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db
 
 		try
 		{
-			var (_, response) = await db.AddGames(user.Id, user.IsPrivileged(), urls);
+			var (_, response) = await db.AddGames(user.Id, privilegeCheckerService.IsPrivileged(user), urls);
 			await RespondAsync(response, ephemeral: true);
 		}
 		catch (Exception e)
@@ -60,7 +60,7 @@ public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db
 		var urlsCombined = await client.GetStringAsync(attachment.Url);
 		var urls = urlsCombined.Split('\n');
 
-		var (_, response) = await db.AddGames(user.Id, user.IsPrivileged(), urls);
+		var (_, response) = await db.AddGames(user.Id, privilegeCheckerService.IsPrivileged(user), urls);
 		await RespondAsync(response, ephemeral: true);
 	}
 

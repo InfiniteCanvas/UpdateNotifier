@@ -9,7 +9,8 @@ using ZLogger;
 
 namespace UpdateNotifier.Commands;
 
-public sealed class UserManagementCommands(ILogger<UserManagementCommands> logger, DataContext db) : InteractionModuleBase<SocketInteractionContext>
+public sealed class UserManagementCommands(ILogger<UserManagementCommands> logger, DataContext db, PrivilegeCheckerService privilegeCheckerService)
+	: InteractionModuleBase<SocketInteractionContext>
 {
 	[SlashCommand("enable", "Enable the bot's functions by accepting the Terms of Service")]
 	public async Task EnableBot()
@@ -201,7 +202,7 @@ public sealed class UserManagementCommands(ILogger<UserManagementCommands> logge
 			return;
 		}
 
-		if (!guildUser.IsPrivileged())
+		if (!privilegeCheckerService.IsPrivileged(guildUser))
 		{
 			await RespondAsync("You need to be a supporter to do this.", ephemeral: true);
 			return;
