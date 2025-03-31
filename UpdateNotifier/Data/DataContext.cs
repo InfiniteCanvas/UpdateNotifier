@@ -198,7 +198,7 @@ public sealed class DataContext(ILogger<DataContext> logger, Config config, Game
 		await using var transaction = await Database.BeginTransactionAsync(ct);
 
 		Watchlist.RemoveRange(watchlistEntries);
-
+		await SaveChangesAsync(ct);
 		await transaction.CommitAsync(ct);
 
 		return (true, $"Successfully removed these games from watchlist: {string.Join(' ', sanitizedUrls)}");
