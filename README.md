@@ -17,10 +17,17 @@ Users can manage personalized game watchlists through Discord commands:
 - Remove games from watchlist
 - View current watchlist
 
+**Companion Extension**  
+A Chromium extension that adds a button to add/remove games from the watchlist.
+Needs the User Hash (get it with `/get_hash`) to work. Optionally sends you a discord notification that a game has been added/removed.
+Get it [here!](https://github.com/InfiniteCanvas/Update-Notifier-Chromium-Extension/releases)
+Download the release, unzip and load unpacked.
+
 ## Planned Supporter Features
 
 - get updates on custom RSS feeds
-- add to watchlist directly from the thread using a plugin (more likely to be a tamper monkey script for now)
+- ~~add to watchlist directly from the thread using a plugin (more likely to be a tamper monkey script for now)~~
+    - done for Chromium browsers
 
 ## Command Reference
 
@@ -31,6 +38,7 @@ Users can manage personalized game watchlists through Discord commands:
 | `/watch [URL1 URL2 ...]`  | Add games to watchlist                                                                                         | `/watch https://f95zone.to/threads/1 https://f95zone.to/threads/2`  |
 | `/remove [URL1 URL2 ...]` | Remove games from watchlist                                                                                    | `/remove https://f95zone.to/threads/1 https://f95zone.to/threads/2` |
 | `/list`                   | Show your watched games                                                                                        | `/list`                                                             |
+| `/get_hash`               | Gets the hash associated with your discord account (needed for plugin)                                         | `/get_hash`                                                         |
 
 ## Docker Deployment
 
@@ -38,6 +46,7 @@ Set these in your Docker deployment if you want to host your own bot. Adjust to 
 When binding a mount, make sure to set permissions with `sudo chown -R 1654:1654 /path/to/folder`
 
 If you build from source:
+
 ```yaml
 services:
   update-notifier:
@@ -55,7 +64,9 @@ services:
     volumes:
       - ./data:/data
 ```
+
 If you pull the image:
+
 ```yaml
 services:
   update-notifier:

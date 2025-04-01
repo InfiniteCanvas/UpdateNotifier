@@ -69,6 +69,8 @@ public sealed class Config
 	public string   XfSession           { get; }
 	public ulong[]  PrivilegedRoleIds   { get; }
 
+	public const int FREE_USER_LIMIT = 69;
+
 	public override string ToString()
 		=> $"{nameof(DatabasePath)}: {DatabasePath}, {nameof(LogsFolderPath)}: {LogsFolderPath}, {nameof(UpdateCheckInterval)}: {UpdateCheckInterval}, {nameof(RssFeedUrls)}: {RssFeedUrls}";
 }

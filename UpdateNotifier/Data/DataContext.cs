@@ -95,10 +95,10 @@ public sealed class DataContext(ILogger<DataContext> logger, Config config, Game
 		}
 
 		var gamesCount = await Watchlist.CountAsync(w => w.UserId == userId, ct);
-		if (!privileged && gamesCount + urls.Length >= 420)
+		if (!privileged && gamesCount + urls.Length >= Config.FREE_USER_LIMIT)
 			return (false, $"You have {gamesCount} games  tracked and want to add {urls.Length} to the watchlist\n"
-			             + $"Wanna keep track of more than 420 games? Why do you even keep track of that many?\n"
-			             + "Support me on patreon (or wherever I setup, idk)!\n"
+			             + $"Wanna keep track of more than {Config.FREE_USER_LIMIT} games?\n"
+			             + "Support me on patreon here: patreon.com/F95UpdateNotifier \n"
 			             + "Or self-host an instance - https://github.com/InfiniteCanvas/UpdateNotifier");
 
 		var sanitizedUrls = urls.Select(url => url.GetSanitizedUrl(out var sanitizedUrl) ? sanitizedUrl : string.Empty)
