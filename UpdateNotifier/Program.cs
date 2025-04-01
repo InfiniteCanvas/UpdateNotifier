@@ -55,6 +55,7 @@ internal class Program
 	private static void ConfigureWebHost(IWebHostBuilder builder)
 		=> builder.Configure(app =>
 		                     {
+			                     app.UseCors("AllowExtension");
 			                     app.UseRouting();
 			                     app.UseEndpoints(ConfigureEndPoints);
 		                     });
@@ -149,6 +150,20 @@ internal class Program
 			                                         options.SerializerOptions.ReferenceHandler =
 				                                         ReferenceHandler.IgnoreCycles;
 		                                         });
+
+		serviceCollection.AddCors(options =>
+		                          {
+			                          options.AddPolicy("AllowExtension",
+			                                            builder =>
+			                                            {
+				                                            builder
+					                                           .WithOrigins("https://f95zone.to", "http://localhost:8080", "http://localhost:5000")
+					                                           .AllowAnyMethod()
+					                                           .AllowAnyHeader()
+					                                           .AllowCredentials()
+					                                           .SetIsOriginAllowedToAllowWildcardSubdomains();
+			                                            });
+		                          });
 
 		var discordConfig = new DiscordSocketConfig
 		{
