@@ -196,15 +196,9 @@ public sealed class UserManagementCommands(ILogger<UserManagementCommands> logge
 			return;
 		}
 
-		if (Context.User is not SocketGuildUser guildUser)
+		if (Context.User is not SocketGuildUser)
 		{
 			await RespondAsync("Something went wrong.", ephemeral: true);
-			return;
-		}
-
-		if (!privilegeCheckerService.IsPrivileged(guildUser))
-		{
-			await RespondAsync("You need to be a supporter to do this.", ephemeral: true);
 			return;
 		}
 
