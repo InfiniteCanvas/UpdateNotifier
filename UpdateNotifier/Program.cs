@@ -191,9 +191,11 @@ internal class Program
 		                 .AddSingleton(provider => new InteractionService(provider.GetRequiredService<DiscordSocketClient>(),
 		                                                                  provider.GetRequiredService<InteractionServiceConfig>()))
 		                 .AddSingleton<Config>()
+		                 .AddDbContext<DataContext>(ServiceLifetime.Transient, ServiceLifetime.Transient)
+		                 // .AddDbContextPool<DataContext>(DbContextOptionsAction) // refactor later; move methods out of DataContext
 		                 .AddSingleton<PrivilegeCheckerService>()
 		                 .AddHostedService(provider => provider.GetRequiredService<PrivilegeCheckerService>())
-		                 .AddSingleton<IEndpointHandlerService, EndpointHandlerService>()
+		                 .AddTransient<IEndpointHandlerService, EndpointHandlerService>()
 		                 .AddSingleton<CommandHandler>()
 		                 .AddHostedService<DiscordBotService>()
 		                 .AddSingleton<NotificationService>()
@@ -201,7 +203,6 @@ internal class Program
 		                 .AddSingleton<RssMonitorService>()
 		                 .AddHostedService(provider => provider.GetRequiredService<RssMonitorService>())
 		                 .AddSingleton<GameInfoProvider>()
-		                 .AddDbContext<DataContext>(ServiceLifetime.Singleton)
 		                 .AddHttpClient("RssFeed",
 		                                (provider, client) =>
 		                                {
