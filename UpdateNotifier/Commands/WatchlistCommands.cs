@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Collections.Immutable;
+using System.Text;
 using Discord;
 using Discord.Commands;
 using Discord.Interactions;
@@ -133,16 +134,18 @@ public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db
 		}
 
 		var user = Context.User;
-		var dbUser = db.Users.Include(u => u.Games).FirstOrDefault(u => u.UserId == user.Id);
-		if (dbUser == null)
+
+		if (!await db.Users.AnyAsync(u => u.UserId == user.Id))
 		{
 			logger.ZLogError($"User {user.Id} does not exist, aborting listing.");
 			await RespondAsync("User not found. Use /enable first.", ephemeral: true);
 			return;
 		}
 
-		var orderedGames = dbUser.Games.OrderByDescending(game => game).ToList();
-		if (orderedGames.Any())
+		var games = await db.Users.Where(g => g.UserId == user.Id).Select(u => u.Games).FirstAsync().ConfigureAwait(false);
+
+		var orderedGames = games.OrderByDescending(game => game).ToImmutableList();
+		if (!orderedGames.IsEmpty)
 		{
 			var gameInfos = (includeTitle, includeUrl) switch
 			{
