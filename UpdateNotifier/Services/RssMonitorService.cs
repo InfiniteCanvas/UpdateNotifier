@@ -45,7 +45,7 @@ public sealed class RssMonitorService(
 	private async ValueTask CheckFeedsAndQueueNotification(Unit _, CancellationToken ct)
 	{
 		logger.ZLogInformation($"RssMonitorService is checking the feeds for updates.");
-		await GetFeed(ct);
+		await GetFeeds(ct);
 
 		while (_feeds.TryDequeue(out var rawFeed))
 		{
@@ -79,13 +79,13 @@ public sealed class RssMonitorService(
 			toUpdate.Add(dbGame);
 		}
 
-		if (toAdd.Any())
+		if (!toAdd.IsEmpty)
 		{
 			logger.ZLogInformation($"Adding [{string.Join(", ", toAdd)}] to database.");
 			db.Games.AddRange(toAdd);
 		}
 
-		if (toUpdate.Any())
+		if (toUpdate.Count != 0)
 		{
 			logger.ZLogInformation($"Updating games: {string.Join(", ", toUpdate)}");
 			db.UpdateRange(toUpdate);
@@ -98,7 +98,7 @@ public sealed class RssMonitorService(
 		await db.SaveChangesAsync(ct);
 	}
 
-	private async Task GetFeed(CancellationToken ct)
+	private async Task GetFeeds(CancellationToken ct)
 	{
 		var client = httpClientFactory.CreateClient("RssFeed");
 		foreach (var feedUrl in config.RssFeedUrls)
@@ -109,7 +109,7 @@ public sealed class RssMonitorService(
 				await using var stream = await client.GetStreamAsync(feedUrl, ct);
 				using var reader = XmlReader.Create(stream);
 				_feeds.Enqueue(SyndicationFeed.Load(reader));
-				logger.ZLogInformation($"RSS feed queued for updates: {feedUrl}");
+				logger.ZLogDebug($"RSS feed queued for updates: {feedUrl}");
 			}
 			catch (Exception e)
 			{

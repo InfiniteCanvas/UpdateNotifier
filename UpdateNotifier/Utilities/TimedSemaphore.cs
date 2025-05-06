@@ -15,6 +15,6 @@ public class TimedSemaphore(int initialCount, int maximumCount, TimeSpan release
 	public async Task WaitAsync(CancellationToken ct)
 	{
 		await _semaphore.WaitAsync(ct);
-		_ = Task.Delay(releaseTime, ct).ContinueWith(_ => _semaphore.Release(), TaskScheduler.Default);
+		_ = Task.Delay(releaseTime, ct).ContinueWith(_ => _semaphore.Release(), TaskScheduler.Current);
 	}
 }

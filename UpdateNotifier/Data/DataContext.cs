@@ -150,7 +150,7 @@ public sealed class DataContext(ILogger<DataContext> logger, Config config, Game
 		}
 
 		var builder = new StringBuilder();
-		if (errors.Any())
+		if (errors.Count != 0)
 		{
 			builder.AppendLine("There were errors during adding to watchlist:");
 			builder.AppendJoin("\n", errors);
@@ -169,7 +169,7 @@ public sealed class DataContext(ILogger<DataContext> logger, Config config, Game
 			builder.AppendJoin(" ", invalid);
 		}
 
-		return errors.Any() ? (false, builder.ToString()) : (true, builder.ToString());
+		return errors.Count != 0 ? (false, builder.ToString()) : (true, builder.ToString());
 	}
 
 	public async Task<(bool success, string response)> RemoveGames(ulong userId, bool privileged, string[] urls, CancellationToken ct = default)
