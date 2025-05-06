@@ -44,7 +44,7 @@ public sealed class RssMonitorService(
 
 	private async ValueTask CheckFeedsAndQueueNotification(Unit _, CancellationToken ct)
 	{
-		logger.ZLogInformation($"RssMonitorService is checking the feeds for updates.");
+		logger.ZLogTrace($"RssMonitorService is checking the feeds for updates.");
 		await GetFeeds(ct);
 
 		while (_feeds.TryDequeue(out var rawFeed))
