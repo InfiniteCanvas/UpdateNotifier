@@ -65,36 +65,24 @@ internal class Program
 		endpoints.MapPost("/api/v1/games",
 		                  async ([FromBody] GameAddRequest addRequest, IEndpointHandlerService handlerService, CancellationToken ct)
 			                  => await handlerService.AddGameAsync(addRequest, ct))
-		         .WithName("AddGame")
-		         .WithTags("Game")
-		         .WithOpenApi(operation =>
-		                      {
-			                      operation.Summary = "Add game for tracking";
-			                      operation.Description = "Create a new watchlist entry for game tracking";
-			                      return operation;
-		                      });
+	         .WithName("AddGame")
+	         .WithTags("Game")
+	         .WithSummary("Add game for tracking")
+	         .WithDescription("Create a new watchlist entry for game tracking");
 		endpoints.MapDelete("/api/v1/games",
 		                    async ([FromBody] GameAddRequest addRequest, IEndpointHandlerService handlerService, CancellationToken ct)
 			                    => await handlerService.RemoveGameAsync(addRequest, ct))
-		         .WithName("RemoveGame")
-		         .WithTags("Game")
-		         .WithOpenApi(operation =>
-		                      {
-			                      operation.Summary = "Remove game from tracking";
-			                      operation.Description = "Remove a watchlist entry from game tracking";
-			                      return operation;
-		                      });
+	         .WithName("RemoveGame")
+	         .WithTags("Game")
+	         .WithSummary("Remove game from tracking")
+	         .WithDescription("Remove a watchlist entry from game tracking");
 		endpoints.MapGet("/api/v1/games",
 		                 async ([FromQuery] string userHash, IEndpointHandlerService handlerService, CancellationToken ct)
 			                 => await handlerService.GetWatchedGamesAsync(userHash, ct))
-		         .WithName("GetIsWatched")
-		         .WithTags("Game")
-		         .WithOpenApi(operation =>
-		                      {
-			                      operation.Summary = "Get game tracking status";
-			                      operation.Description = "Get game tracking status";
-			                      return operation;
-		                      });
+	         .WithName("GetIsWatched")
+	         .WithTags("Game")
+	         .WithSummary("Get game tracking status")
+	         .WithDescription("Get game tracking status");
 	}
 
 	private static void ConfigureLogging(ILoggingBuilder builder)
