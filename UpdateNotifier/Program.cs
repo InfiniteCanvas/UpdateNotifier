@@ -13,6 +13,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Scalar.AspNetCore;
 using UpdateNotifier.Commands;
 using UpdateNotifier.Data;
 using UpdateNotifier.Data.Requests;
@@ -62,6 +63,8 @@ internal class Program
 
 	private static void ConfigureEndPoints(IEndpointRouteBuilder endpoints)
 	{
+		endpoints.MapOpenApi();
+		endpoints.MapScalarApiReference(options => options.Title = "UpdateNotifier API");
 		endpoints.MapPost("/api/v1/games",
 		                  async ([FromBody] GameAddRequest addRequest, IEndpointHandlerService handlerService, CancellationToken ct)
 			                  => await handlerService.AddGameAsync(addRequest, ct))
@@ -131,7 +134,7 @@ internal class Program
 		serviceCollection.AddOpenApi("v1",
 		                             options =>
 		                             {
-			                             options.ShouldInclude = description => description.RelativePath != null && description.RelativePath.StartsWith("/api/v1/game");
+			                             options.ShouldInclude = description => description.RelativePath != null && description.RelativePath.StartsWith("api/v1/game");
 		                             });
 		serviceCollection.Configure<JsonOptions>(options =>
 		                                         {
