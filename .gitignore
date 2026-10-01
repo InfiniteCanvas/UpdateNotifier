@@ -4,6 +4,9 @@ obj/
 riderModule.iml
 /_ReSharper.Caches/
 
+# Local secrets (bot token, session cookies)
+.env
+
 ### DotnetCore template
 # .NET Core build folders
 bin/

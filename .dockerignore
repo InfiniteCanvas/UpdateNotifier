@@ -9,11 +9,13 @@
 **/.vscode
 **/.idea
 **/*.*proj.user
+**/*.db
 **/*.dbmdl
 **/*.jfm
 **/azds.yaml
 **/bin
 **/charts
+**/data
 **/docker-compose*
 **/Dockerfile*
 **/node_modules

@@ -4,7 +4,7 @@ using Discord.WebSocket;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using UpdateNotifier.Commands;
-using UpdateNotifier.Utilities;
+using UpdateNotifier.Bot;
 using ZLogger;
 
 namespace UpdateNotifier.Services;
@@ -13,7 +13,7 @@ public class DiscordBotService(
 	DiscordSocketClient        client,
 	InteractionService         interactionService,
 	CommandHandler             commandHandler,
-	Config                     config,
+	BotConfig                  config,
 	ILogger<DiscordBotService> logger)
 	: BackgroundService
 {

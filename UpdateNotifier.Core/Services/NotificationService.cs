@@ -1,8 +1,7 @@
-﻿using System.Threading.Channels;
-using Discord;
-using Discord.WebSocket;
+using System.Threading.Channels;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using UpdateNotifier.Abstractions;
 using UpdateNotifier.Data.Models;
 using ZLogger;
 using Game = UpdateNotifier.Data.Models.Game;
@@ -11,15 +10,15 @@ namespace UpdateNotifier.Services;
 
 public sealed class NotificationService : BackgroundService
 {
-	private readonly DiscordSocketClient          _client;
+	private readonly IDmSender                    _dmSender;
 	private readonly ILogger<NotificationService> _logger;
 	private readonly RssMonitorService            _monitorService;
 
 	private readonly Channel<Notification> _notificationQueue;
 
-	public NotificationService(ILogger<NotificationService> logger, RssMonitorService monitorService, DiscordSocketClient client)
+	public NotificationService(ILogger<NotificationService> logger, RssMonitorService monitorService, IDmSender dmSender)
 	{
-		_client = client;
+		_dmSender = dmSender;
 		_logger = logger;
 		_monitorService = monitorService;
 		_notificationQueue = Channel.CreateUnbounded<Notification>();
@@ -77,9 +76,7 @@ public sealed class NotificationService : BackgroundService
 		while (await _notificationQueue.Reader.WaitToReadAsync(stoppingToken))
 		{
 			var notification = await _notificationQueue.Reader.ReadAsync(stoppingToken);
-			var user = await _client.GetUserAsync(notification.User.UserId, new RequestOptions { CancelToken = stoppingToken });
-			_logger.ZLogInformation($"Sending notification to {user.Username}: {notification.Message}");
-			await user.SendMessageAsync(notification.Message, options: new RequestOptions { CancelToken = stoppingToken });
+			await _dmSender.SendDmAsync(notification.User.UserId, notification.Message, stoppingToken);
 		}
 	}
 

@@ -1,11 +1,9 @@
-﻿using Discord;
-using Discord.WebSocket;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using UpdateNotifier.Abstractions;
 using UpdateNotifier.Data;
 using UpdateNotifier.Data.Requests;
-using UpdateNotifier.Utilities;
 using ZLogger;
 
 namespace UpdateNotifier.Services;
@@ -19,7 +17,7 @@ public interface IEndpointHandlerService
 	public ValueTask<IResult> GetWatchedGamesAsync(string userHash, CancellationToken ct = default);
 }
 
-public class EndpointHandlerService(DataContext db, ILogger<EndpointHandlerService> logger, PrivilegeCheckerService privilegeCheckerService, DiscordSocketClient client)
+public class EndpointHandlerService(DataContext db, ILogger<EndpointHandlerService> logger, IPrivilegeChecker privilegeChecker, IDmSender dmSender)
 	: IEndpointHandlerService
 {
 	public async ValueTask<IResult> AddGameAsync(GameAddRequest request, CancellationToken ct = default)
@@ -32,13 +30,12 @@ public class EndpointHandlerService(DataContext db, ILogger<EndpointHandlerServi
 			return Results.BadRequest("User was not found");
 		}
 
-		var (success, response) = await db.AddGames(user.UserId, await privilegeCheckerService.IsPrivileged(user.UserId), [request.ThreadUrl], ct);
+		var (success, response) = await db.AddGames(user.UserId, await privilegeChecker.IsPrivilegedAsync(user.UserId, ct), [request.ThreadUrl], ct);
 
 		if (!request.DiscordNotification) return success ? Results.Ok(response) : Results.BadRequest(response);
 
 		logger.ZLogDebug($"Success [{success}]: {response}");
-		var discordUser = await client.GetUserAsync(user.UserId);
-		await discordUser.SendMessageAsync(response);
+		await dmSender.SendDmAsync(user.UserId, response, ct);
 
 		return success ? Results.Ok(response) : Results.BadRequest(response);
 	}
@@ -53,13 +50,12 @@ public class EndpointHandlerService(DataContext db, ILogger<EndpointHandlerServi
 			return Results.BadRequest("User was not found");
 		}
 
-		var (success, response) = await db.RemoveGames(user.UserId, await privilegeCheckerService.IsPrivileged(user.UserId), [request.ThreadUrl], ct);
+		var (success, response) = await db.RemoveGames(user.UserId, await privilegeChecker.IsPrivilegedAsync(user.UserId, ct), [request.ThreadUrl], ct);
 
 		if (!request.DiscordNotification) return success ? Results.Ok(response) : Results.BadRequest(response);
 
 		logger.ZLogDebug($"Success [{success}]: {response}");
-		var discordUser = await client.GetUserAsync(user.UserId);
-		await discordUser.SendMessageAsync(response);
+		await dmSender.SendDmAsync(user.UserId, response, ct);
 
 		return success ? Results.Ok(response) : Results.BadRequest(response);
 	}

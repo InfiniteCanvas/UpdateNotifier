@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <LangVersion>latest</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <RootNamespace>UpdateNotifier</RootNamespace>
+        <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+        <TargetFramework>net10.0</TargetFramework>
+    </PropertyGroup>
+
+    <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+        <DebugType>none</DebugType>
+    </PropertyGroup>
+
+    <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+        <DebugType>embedded</DebugType>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Discord.Net" Version="3.20.1"/>
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12"/>
+        <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.12"/>
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12"/>
+        <PackageReference Include="ZLogger" Version="2.5.10"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\UpdateNotifier.Core\UpdateNotifier.Core.csproj"/>
+    </ItemGroup>
+
+</Project>

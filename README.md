@@ -90,6 +90,7 @@ Environment variables:
 | Variable            | Default      | Description                                                                     |
 |---------------------|--------------|---------------------------------------------------------------------------------|
 | DISCORD_BOT_TOKEN   | -            | Your discord bot token                                                          |
+| DISABLE_DISCORD     | false        | Run without the Discord bot (RSS monitor + API only, DMs are no-ops)            |
 | DISCORD_GUILD_ID    | -            | Your discord server                                                             |
 | DATABASE_PATH       | /data/app.db | SQLite db location                                                              |
 | LOGS_FOLDER         | /data/logs   | Folder where logs are put                                                       |
@@ -97,4 +98,14 @@ Environment variables:
 | SELF_HOSTED         | false        | Basically makes you a supporter on your instance                                |
 | XF_USER             | -            | cookies                                                                         |
 | XF_SESSION          | -            | cookies (I had these because I got cucked by ratelimits as anon user for tests) |
+
+## Headless Mode
+
+Set `DISABLE_DISCORD=true` (or leave `DISCORD_BOT_TOKEN` empty) to run without the bot:
+the RSS monitor and the HTTP API for the browser extension still work, but no Discord
+client connects and every DM notification is logged and dropped instead of sent. Useful
+for local development and testing without a bot token.
+
+Note: in headless mode nobody can be verified as a supporter, so unless `SELF_HOSTED=true`
+is set, all users are subject to the free watchlist limit.
 

@@ -4,12 +4,11 @@ using Discord.WebSocket;
 using Microsoft.Extensions.Logging;
 using UpdateNotifier.Data;
 using UpdateNotifier.Data.Models;
-using UpdateNotifier.Utilities;
 using ZLogger;
 
 namespace UpdateNotifier.Commands;
 
-public sealed class UserManagementCommands(ILogger<UserManagementCommands> logger, DataContext db, PrivilegeCheckerService privilegeCheckerService)
+public sealed class UserManagementCommands(ILogger<UserManagementCommands> logger, DataContext db)
 	: InteractionModuleBase<SocketInteractionContext>
 {
 	[SlashCommand("enable", "Enable the bot's functions by accepting the Terms of Service")]

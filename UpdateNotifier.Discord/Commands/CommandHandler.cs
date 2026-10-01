@@ -3,7 +3,7 @@ using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
 using Microsoft.Extensions.Logging;
-using UpdateNotifier.Utilities;
+using UpdateNotifier.Bot;
 using ZLogger;
 
 namespace UpdateNotifier.Commands;
@@ -12,13 +12,13 @@ public sealed class CommandHandler(
 	ILogger<CommandHandler> logger,
 	IServiceProvider        services,
 	DiscordSocketClient     client,
-	Config                  config,
+	BotConfig                  config,
 	InteractionService      interactionService)
 {
 	public async Task InitializeAsync()
 	{
 		// https://docs.discordnet.dev/guides/int_framework/intro.html#resolving-module-dependencies
-		await interactionService.AddModulesAsync(Assembly.GetEntryAssembly(), services);
+		await interactionService.AddModulesAsync(typeof(CommandHandler).Assembly, services);
 		client.InteractionCreated += HandleInteractionAsync;
 		interactionService.SlashCommandExecuted += SlashCommandExecutedAsync;
 

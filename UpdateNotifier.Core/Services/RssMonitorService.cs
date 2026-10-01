@@ -60,7 +60,7 @@ public sealed class RssMonitorService(
 		}
 	}
 
-	private async Task CheckFeed(SyndicationFeed rawFeed, CancellationToken ct)
+	internal async Task CheckFeed(SyndicationFeed rawFeed, CancellationToken ct)
 	{
 		var feed = Transform(rawFeed).ToImmutableList();
 		// to list so we actually fetch the query
