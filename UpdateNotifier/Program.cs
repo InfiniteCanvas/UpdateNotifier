@@ -69,6 +69,7 @@ internal class Program
             app.UseDefaultFiles(); // SPA bundle lands in wwwroot at publish time (placeholder in dev)
             app.UseStaticFiles();
             app.UseRouting();
+            app.UseCors(); // parameterless: honors per-endpoint RequireCors metadata (extension endpoints only)
             app.UseRateLimiter(); // after UseRouting (reads endpoint metadata), before UseEndpoints
             app.UseEndpoints(ConfigureEndPoints);
         });

@@ -435,6 +435,36 @@ public sealed class WebAuthTests(DatabaseFixture fixture)
 	}
 
 	[Fact]
+	public async Task ConsumeLinkCode_NotEnabled_DoesNotBurnTheCode()
+	{
+		var web = await RegisterAsync("code-survives-notenabled");
+		var discordUserId = UserIdBase + 7;
+		await EnableDiscordUserAsync(fixture, discordUserId, "late-enabler");
+
+		string code;
+		await using (var db = fixture.CreateContext())
+		{
+			var link = await CreateService(db).CreateLinkCodeAsync(web.AccountId);
+			Assert.NotNull(link);
+			code = link!.Value.Code;
+		}
+
+		// first attempt with an unknown snowflake: NotEnabled, and the code must survive
+		await using (var db = fixture.CreateContext())
+		{
+			var outcome = await CreateService(db).ConsumeLinkCodeAsync(code, UserIdBase + 8, "unknown");
+			Assert.Equal(LinkOutcomeKind.NotEnabled, outcome.Kind);
+		}
+
+		// the same code still works for a user who IS enabled
+		await using (var db = fixture.CreateContext())
+		{
+			var outcome = await CreateService(db).ConsumeLinkCodeAsync(code, discordUserId, "late-enabler");
+			Assert.True(outcome.IsSuccess);
+		}
+	}
+
+	[Fact]
 	public async Task CreateLinkCode_ReplacesPriorUnconsumedCodes()
 	{
 		var web = await RegisterAsync("code-rotation");

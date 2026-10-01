@@ -72,6 +72,8 @@ public sealed class RssMonitorService(
 
 	internal async Task CheckFeed(SyndicationFeed rawFeed, CancellationToken ct)
 	{
+		// a failed prior cycle can leave half-added entities tracked; start every feed check clean
+		db.ChangeTracker.Clear();
 		var feed = Transform(rawFeed).ToImmutableList();
 		// to list so we actually fetch the query; hop through the account to the linked Discord identity
 		var toCheck = db.Games.Include(g => g.Watchers).ThenInclude(a => a.User).Where(dbGame => feed.Contains(dbGame)).ToImmutableList();

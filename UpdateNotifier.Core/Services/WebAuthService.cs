@@ -268,15 +268,17 @@ public sealed partial class WebAuthService(DataContext db, ILogger<WebAuthServic
 			if (targetAccountId is not ulong targetId)
 				return LinkOutcome.Invalid();
 
-			var consumed = await db.LinkCodes.Where(l => l.Code == code && l.ExpiresAt > now).ExecuteDeleteAsync(ct);
-			if (consumed != 1)
-				return LinkOutcome.Invalid(); // same generic message as expired - never leak "already used"
-
-			// the bot creates the user through /enable; linking cannot substitute for it
+			// the bot creates the user through /enable; linking cannot substitute for it.
+			// checked BEFORE consuming the code, otherwise a NotEnabled user burns their code
+			// and the "run /enable, then try again" advice becomes impossible to follow
 			var user = await db.Users.Include(u => u.Account)
 			                  .FirstOrDefaultAsync(u => u.UserId == discordSnowflake, ct);
 			if (user is null)
 				return LinkOutcome.NotEnabled();
+
+			var consumed = await db.LinkCodes.Where(l => l.Code == code && l.ExpiresAt > now).ExecuteDeleteAsync(ct);
+			if (consumed != 1)
+				return LinkOutcome.Invalid(); // same generic message as expired - never leak "already used"
 
 			if (user.AccountId == targetId)
 				return LinkOutcome.AlreadyLinked();

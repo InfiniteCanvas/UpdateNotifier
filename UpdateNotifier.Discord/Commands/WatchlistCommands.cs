@@ -31,7 +31,7 @@ public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db
 		try
 		{
 			var account = db.Users.Include(u => u.Account)
-			                .First(u => u.UserId == user.Id).Account;
+			                .FirstOrDefault(u => u.UserId == user.Id)?.Account;
 			if (account == null)
 			{
 				await RespondAsync("Use /enable first.", ephemeral: true);
@@ -65,20 +65,28 @@ public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db
 			return;
 		}
 
-		var client = httpClientFactory.CreateClient();
-		var urlsCombined = await client.GetStringAsync(attachment.Url);
-		var urls = urlsCombined.Split('\n');
-
-		var account = db.Users.Include(u => u.Account)
-		                .First(u => u.UserId == user.Id).Account;
-		if (account == null)
+		try
 		{
-			await RespondAsync("Use /enable first.", ephemeral: true);
-			return;
-		}
+			var client = httpClientFactory.CreateClient();
+			var urlsCombined = await client.GetStringAsync(attachment.Url);
+			var urls = urlsCombined.Split('\n');
 
-		var (_, response) = await db.TrackGames(account.Hash, urls, privilegeChecker.IsPrivileged(user));
-		await RespondAsync(response, ephemeral: true);
+			var account = db.Users.Include(u => u.Account)
+			                .FirstOrDefault(u => u.UserId == user.Id)?.Account;
+			if (account == null)
+			{
+				await RespondAsync("Use /enable first.", ephemeral: true);
+				return;
+			}
+
+			var (_, response) = await db.TrackGames(account.Hash, urls, privilegeChecker.IsPrivileged(user));
+			await RespondAsync(response, ephemeral: true);
+		}
+		catch (Exception e)
+		{
+			logger.ZLogError(e, $"[{e.GetType()}]Failed to import watchlist from {attachment.Url}");
+			await RespondAsync("Something went wrong while importing the watchlist.", ephemeral: true);
+		}
 	}
 
 	[SlashCommand("unwatch", "Remove threads from the watchlist."), Alias("remove")]
