@@ -27,7 +27,17 @@ public sealed class RssMonitorService(
 
 	public override void Dispose()
 	{
-		_disposable.Dispose();
+		// DisposableBag is a struct, so it cannot be null-checked; if ExecuteAsync never ran
+		// the default bag may not survive Dispose, and a throwing Dispose must be swallowed here.
+		try
+		{
+			_disposable.Dispose();
+		}
+		catch (NullReferenceException)
+		{
+			// Dispose was called before ExecuteAsync built the bag - nothing to release.
+		}
+
 		base.Dispose();
 	}
 
@@ -63,8 +73,8 @@ public sealed class RssMonitorService(
 	internal async Task CheckFeed(SyndicationFeed rawFeed, CancellationToken ct)
 	{
 		var feed = Transform(rawFeed).ToImmutableList();
-		// to list so we actually fetch the query
-		var toCheck = db.Games.Include(g => g.Watchers).Where(dbGame => feed.Contains(dbGame)).ToImmutableList();
+		// to list so we actually fetch the query; hop through the account to the linked Discord identity
+		var toCheck = db.Games.Include(g => g.Watchers).ThenInclude(a => a.User).Where(dbGame => feed.Contains(dbGame)).ToImmutableList();
 		logger.ZLogTrace($"To Check: {toCheck}");
 		var toAdd = feed.Except(toCheck).ToImmutableList();
 		logger.ZLogTrace($"To Add: {toAdd}");
@@ -96,6 +106,9 @@ public sealed class RssMonitorService(
 		logger.ZLogTrace($"To Update: {toUpdate}");
 
 		await db.SaveChangesAsync(ct);
+
+		// tracked watchers would otherwise go stale across feed checks (ghost watchers, duplicate DMs)
+		db.ChangeTracker.Clear();
 	}
 
 	private async Task GetFeeds(CancellationToken ct)

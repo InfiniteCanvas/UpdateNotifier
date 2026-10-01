@@ -40,34 +40,38 @@ public sealed class NotificationService : BackgroundService
 	private void OnGamesUpdated(List<Game> updates)
 	{
 		_logger.ZLogInformation($"Games updated [{updates.Count}]; Notifying subscribers..");
-		var notifications = new Dictionary<User, List<Game>>();
+		// project to (userId, update) tuples; web-only accounts have no Discord identity to DM
+		var notifications = new Dictionary<ulong, List<Game>>();
 		foreach (var update in updates)
 		{
 			foreach (var watcher in update.Watchers)
 			{
-				if (notifications.TryGetValue(watcher, out var games))
+				var userId = watcher.User?.UserId;
+				if (userId == null) continue;
+
+				if (notifications.TryGetValue(userId.Value, out var games))
 					games.Add(update);
 				else
-					notifications.Add(watcher, [update]);
+					notifications.Add(userId.Value, [update]);
 			}
 		}
 
 		foreach (var notification in notifications)
 		{
-			_logger.ZLogTrace($"Notifying subscribers for {notification.Key}.");
+			_logger.ZLogTrace($"Notifying subscribers for user {notification.Key}.");
 			NotifyUser(notification.Key, string.Join('\n', notification.Value.Select(g => g.Url)));
 		}
 	}
 
-	private void NotifyUser(User user, string message)
+	private void NotifyUser(ulong userId, string message)
 	{
 		try
 		{
-			_notificationQueue.Writer.TryWrite(new Notification(user, message));
+			_notificationQueue.Writer.TryWrite(new Notification(userId, message));
 		}
 		catch
 		{
-			_logger.ZLogError($"User {user} does not exist, cannot notify.");
+			_logger.ZLogError($"User {userId} does not exist, cannot notify.");
 		}
 	}
 
@@ -76,13 +80,22 @@ public sealed class NotificationService : BackgroundService
 		while (await _notificationQueue.Reader.WaitToReadAsync(stoppingToken))
 		{
 			var notification = await _notificationQueue.Reader.ReadAsync(stoppingToken);
-			await _dmSender.SendDmAsync(notification.User.UserId, notification.Message, stoppingToken);
+			try
+			{
+				await _dmSender.SendDmAsync(notification.UserId, notification.Message, stoppingToken);
+			}
+			catch (Exception e)
+			{
+				// one failing DM must not kill this BackgroundService - and with
+				// BackgroundServiceExceptionBehavior.StopHost it would take the whole host down
+				_logger.ZLogError(e, $"Failed to send notification to user {notification.UserId}.");
+			}
 		}
 	}
 
-	private class Notification(User user, string message)
+	private sealed class Notification(ulong userId, string message)
 	{
 		public readonly string Message = message;
-		public readonly User   User    = user;
+		public readonly ulong   UserId  = userId;
 	}
 }

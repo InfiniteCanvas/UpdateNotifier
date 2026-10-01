@@ -39,6 +39,18 @@ internal class Program
         using (var scope = host.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<DataContext>();
+
+            // The AccountLinking migration rotates every extension hash - that is irreversible.
+            // Snapshot the database file before touching it so an operator can roll back by restoring the copy.
+            var config = scope.ServiceProvider.GetRequiredService<Config>();
+            if (db.Database.GetPendingMigrations().Any() && File.Exists(config.DatabasePath))
+            {
+                var backupPath = config.DatabasePath + $".pre-migration-{DateTime.Now:yyyyMMdd-HHmmss}";
+                File.Copy(config.DatabasePath, backupPath); // no overwrite: a collision should fail loudly
+                scope.ServiceProvider.GetRequiredService<ILogger<Program>>()
+                    .ZLogWarning($"Pending database migration: backed up {config.DatabasePath} to {backupPath}.");
+            }
+
             await db.Database.MigrateAsync();
 
             if (headless)

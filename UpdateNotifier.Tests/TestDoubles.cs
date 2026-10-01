@@ -31,6 +31,27 @@ public sealed class FakeDmSender : IDmSender
 	}
 }
 
+/// <summary>
+///     Throws on the very first send and succeeds afterwards - proves a failing DM must not
+///     kill the notification loop (and with it, via StopHost, the whole host).
+/// </summary>
+public sealed class FlakyDmSender : IDmSender
+{
+	private int _calls;
+
+	public int Calls => Volatile.Read(ref _calls);
+
+	public List<(ulong UserId, string Message)> Sends { get; } = [];
+
+	public ValueTask SendDmAsync(ulong userId, string message, CancellationToken ct = default)
+	{
+		var call = Interlocked.Increment(ref _calls);
+		if (call == 1) throw new InvalidOperationException("Simulated DM failure.");
+		Sends.Add((userId, message));
+		return ValueTask.CompletedTask;
+	}
+}
+
 public sealed class FakePrivilegeChecker(bool privileged) : IPrivilegeChecker
 {
 	public ValueTask<bool> IsPrivilegedAsync(ulong userId, CancellationToken ct = default)

@@ -19,16 +19,20 @@ public sealed class EndpointHandlerServiceTests(DatabaseFixture fixture)
 		       privileges,
 		       sender);
 
-	private static async Task<string> SeedUserAsync(DatabaseFixture fixture, ulong userId)
+	/// <summary>Creates the account + linked user the way production does, and returns the account's hash and id.</summary>
+	private static async Task<(string Hash, ulong AccountId)> SeedUserAsync(DatabaseFixture fixture, ulong userId)
 	{
 		await using (var db = fixture.CreateContext())
 		{
-			db.Users.Add(new User(userId));
-			await db.SaveChangesAsync();
+			Assert.True(db.AddUser(userId, $"user-{userId}"));
 		}
 
-		await using (var db = fixture.CreateContext())
-			return await db.Users.Where(u => u.UserId == userId).Select(u => u.Hash).SingleAsync();
+		await using var verify = fixture.CreateContext();
+		var account = await verify.Users.Where(u => u.UserId == userId)
+		                          .Select(u => new { u.Account!.Hash, u.AccountId })
+		                          .SingleAsync();
+		Assert.Matches("^[0-9A-F]{40}$", account.Hash);
+		return (account.Hash, account.AccountId);
 	}
 
 	private static async Task SeedGameAsync(DatabaseFixture fixture, ulong gameId, string title)
@@ -42,14 +46,25 @@ public sealed class EndpointHandlerServiceTests(DatabaseFixture fixture)
 		=> $"https://f95zone.to/threads/some-game.{gameId}/";
 
 	[Fact]
-	public async Task AddGame_UnknownUserHash_ReturnsBadRequest()
+	public async Task AddGame_UnknownUserHash_ReturnsNotFound()
 	{
 		await using var db = fixture.CreateContext();
 		var handler = CreateHandler(db, new FakeDmSender(), new FakePrivilegeChecker(false));
 
 		var result = await handler.AddGameAsync(new GameAddRequest { ThreadUrl = ThreadUrl(1), UserHash = "NO-SUCH-HASH" });
 
-		Assert.Equal(400, ((IStatusCodeHttpResult) result).StatusCode);
+		Assert.Equal(404, ((IStatusCodeHttpResult) result).StatusCode);
+	}
+
+	[Fact]
+	public async Task RemoveGame_UnknownUserHash_ReturnsNotFound()
+	{
+		await using var db = fixture.CreateContext();
+		var handler = CreateHandler(db, new FakeDmSender(), new FakePrivilegeChecker(false));
+
+		var result = await handler.RemoveGameAsync(new GameAddRequest { ThreadUrl = ThreadUrl(1), UserHash = "NO-SUCH-HASH" });
+
+		Assert.Equal(404, ((IStatusCodeHttpResult) result).StatusCode);
 	}
 
 	[Fact]
@@ -57,7 +72,7 @@ public sealed class EndpointHandlerServiceTests(DatabaseFixture fixture)
 	{
 		const ulong userId = UserIdBase + 1;
 		const ulong gameId = GameIdBase + 1;
-		var hash = await SeedUserAsync(fixture, userId);
+		var (hash, accountId) = await SeedUserAsync(fixture, userId);
 		await SeedGameAsync(fixture, gameId, "Seeded Game");
 
 		await using var db = fixture.CreateContext();
@@ -70,16 +85,16 @@ public sealed class EndpointHandlerServiceTests(DatabaseFixture fixture)
 		Assert.Contains("Games added", Assert.IsType<string>(((IValueHttpResult) result).Value));
 
 		await using var verify = fixture.CreateContext();
-		Assert.True(await verify.Watchlist.AnyAsync(w => w.UserId == userId && w.GameId == gameId));
+		Assert.True(await verify.Watchlist.AnyAsync(w => w.AccountId == accountId && w.GameId == gameId));
 		Assert.Empty(sender.Sends);
 	}
 
 	[Fact]
-	public async Task AddGame_WithDiscordNotification_SendsDmToUser()
+	public async Task AddGame_WithDiscordNotification_SendsDmToLinkedUser()
 	{
 		const ulong userId = UserIdBase + 2;
 		const ulong gameId = GameIdBase + 2;
-		var hash = await SeedUserAsync(fixture, userId);
+		var (hash, _) = await SeedUserAsync(fixture, userId);
 		await SeedGameAsync(fixture, gameId, "Seeded Game");
 
 		await using var db = fixture.CreateContext();
@@ -99,12 +114,12 @@ public sealed class EndpointHandlerServiceTests(DatabaseFixture fixture)
 	{
 		const ulong userId = UserIdBase + 3;
 		const ulong gameId = GameIdBase + 3;
-		var hash = await SeedUserAsync(fixture, userId);
+		var (hash, accountId) = await SeedUserAsync(fixture, userId);
 		await SeedGameAsync(fixture, gameId, "Seeded Game");
 
 		await using (var db = fixture.CreateContext())
 		{
-			db.Watchlist.Add(new WatchlistEntry { UserId = userId, GameId = gameId });
+			db.Watchlist.Add(new WatchlistEntry { AccountId = accountId, GameId = gameId });
 			await db.SaveChangesAsync();
 		}
 
@@ -116,7 +131,7 @@ public sealed class EndpointHandlerServiceTests(DatabaseFixture fixture)
 		Assert.Equal(200, ((IStatusCodeHttpResult) result).StatusCode);
 
 		await using var verify = fixture.CreateContext();
-		Assert.False(await verify.Watchlist.AnyAsync(w => w.UserId == userId && w.GameId == gameId));
+		Assert.False(await verify.Watchlist.AnyAsync(w => w.AccountId == accountId && w.GameId == gameId));
 	}
 
 	[Fact]
@@ -125,14 +140,14 @@ public sealed class EndpointHandlerServiceTests(DatabaseFixture fixture)
 		const ulong userId = UserIdBase + 4;
 		const ulong gameA = GameIdBase + 4;
 		const ulong gameB = GameIdBase + 5;
-		var hash = await SeedUserAsync(fixture, userId);
+		var (hash, accountId) = await SeedUserAsync(fixture, userId);
 		await SeedGameAsync(fixture, gameA, "Game A");
 		await SeedGameAsync(fixture, gameB, "Game B");
 
 		await using (var db = fixture.CreateContext())
 		{
-			db.Watchlist.Add(new WatchlistEntry { UserId = userId, GameId = gameA });
-			db.Watchlist.Add(new WatchlistEntry { UserId = userId, GameId = gameB });
+			db.Watchlist.Add(new WatchlistEntry { AccountId = accountId, GameId = gameA });
+			db.Watchlist.Add(new WatchlistEntry { AccountId = accountId, GameId = gameB });
 			await db.SaveChangesAsync();
 		}
 
@@ -144,5 +159,16 @@ public sealed class EndpointHandlerServiceTests(DatabaseFixture fixture)
 		Assert.Equal(200, ((IStatusCodeHttpResult) result).StatusCode);
 		var gameIds = Assert.IsAssignableFrom<IEnumerable<ulong>>(((IValueHttpResult) result).Value).OrderBy(id => id).ToList();
 		Assert.Equal([gameA, gameB], gameIds);
+	}
+
+	[Fact]
+	public async Task GetWatchedGames_UnknownUserHash_ReturnsNotFound()
+	{
+		await using var db = fixture.CreateContext();
+		var handler = CreateHandler(db, new FakeDmSender(), new FakePrivilegeChecker(false));
+
+		var result = await handler.GetWatchedGamesAsync("NO-SUCH-HASH");
+
+		Assert.Equal(404, ((IStatusCodeHttpResult) result).StatusCode);
 	}
 }

@@ -1,6 +1,7 @@
 ﻿using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using UpdateNotifier.Data;
 using UpdateNotifier.Data.Models;
@@ -59,8 +60,8 @@ public sealed class UserManagementCommands(ILogger<UserManagementCommands> logge
 	{
 		var userId = Context.User.Id;
 
-		// Add user to database
-		var success = db.AddUser(userId);
+		// Add user to database (creates the account + the Discord identity link)
+		var success = db.AddUser(userId, Context.User.GlobalName ?? Context.User.Username);
 
 		if (success)
 		{
@@ -119,7 +120,8 @@ public sealed class UserManagementCommands(ILogger<UserManagementCommands> logge
 		           .WithTitle("Are you sure?")
 		           .WithDescription("By disabling this bot's service, the following will happen:\n\n"
 		                          + "1. The watchlist associated with your user id will be deleted.\n"
-		                          + "2. Your user id will be deleted.")
+		                          + "2. Your user id will be deleted.\n"
+		                          + "3. Your linked website account (if any) will be deleted.")
 		           .WithColor(Color.Blue)
 		           .WithFooter("UpdateNotifier Bot")
 		           .WithCurrentTimestamp()
@@ -140,7 +142,7 @@ public sealed class UserManagementCommands(ILogger<UserManagementCommands> logge
 	{
 		var userId = Context.User.Id;
 
-		var success = db.RemoveUser(userId);
+		var success = await db.RemoveUser(userId);
 
 		if (success)
 		{
@@ -188,19 +190,21 @@ public sealed class UserManagementCommands(ILogger<UserManagementCommands> logge
 	[SlashCommand("get_hash", "Get the hash of the user.")]
 	public async Task GetHash()
 	{
-		var user = db.Find<User>(Context.User.Id);
+		var user = await db.Users.Include(u => u.Account)
+		                   .FirstOrDefaultAsync(u => u.UserId == Context.User.Id);
 		if (user == null)
 		{
 			await RespondAsync("This user doesn't exist.", ephemeral: true);
 			return;
 		}
 
-		if (Context.User is not SocketGuildUser)
+		var hash = user.Account?.Hash;
+		if (hash == null)
 		{
 			await RespondAsync("Something went wrong.", ephemeral: true);
 			return;
 		}
 
-		await RespondAsync($"Hash: {user.Hash}", ephemeral: true);
+		await RespondAsync($"Hash: {hash}", ephemeral: true);
 	}
 }

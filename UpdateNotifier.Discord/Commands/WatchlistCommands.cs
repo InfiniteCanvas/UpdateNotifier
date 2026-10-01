@@ -1,5 +1,4 @@
 ﻿using System.Collections.Immutable;
-using System.Text;
 using Discord;
 using Discord.Commands;
 using Discord.Interactions;
@@ -31,7 +30,15 @@ public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db
 
 		try
 		{
-			var (_, response) = await db.AddGames(user.Id, privilegeChecker.IsPrivileged(user), urls);
+			var account = db.Users.Include(u => u.Account)
+			                .First(u => u.UserId == user.Id).Account;
+			if (account == null)
+			{
+				await RespondAsync("Use /enable first.", ephemeral: true);
+				return;
+			}
+
+			var (_, response) = await db.TrackGames(account.Hash, urls, privilegeChecker.IsPrivileged(user));
 			await RespondAsync(response, ephemeral: true);
 		}
 		catch (Exception e)
@@ -62,7 +69,15 @@ public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db
 		var urlsCombined = await client.GetStringAsync(attachment.Url);
 		var urls = urlsCombined.Split('\n');
 
-		var (_, response) = await db.AddGames(user.Id, privilegeChecker.IsPrivileged(user), urls);
+		var account = db.Users.Include(u => u.Account)
+		                .First(u => u.UserId == user.Id).Account;
+		if (account == null)
+		{
+			await RespondAsync("Use /enable first.", ephemeral: true);
+			return;
+		}
+
+		var (_, response) = await db.TrackGames(account.Hash, urls, privilegeChecker.IsPrivileged(user));
 		await RespondAsync(response, ephemeral: true);
 	}
 
@@ -71,56 +86,18 @@ public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db
 	{
 		var urls = urlsCombined.Split(' ');
 		var user = Context.User;
-		var dbUser = db.Users.Include(u => u.Games).FirstOrDefault(u => u.UserId == user.Id);
-		if (dbUser == null)
+		var account = db.Users.Include(u => u.Account)
+		                .FirstOrDefault(u => u.UserId == user.Id)?.Account;
+		if (account == null)
 		{
-			logger.ZLogError($"User {user.Id} does not exist, aborting adding to watchlist.");
+			logger.ZLogError($"User {user.Id} does not exist, aborting removing from watchlist.");
 			await RespondAsync("User not found. Use /enable first.", ephemeral: true);
 			return;
 		}
 
-		var sanitizedUrls = urls.Select(url => url.GetSanitizedUrl(out var sanitizedUrl) ? sanitizedUrl : string.Empty)
-		                        .Where(s => !string.IsNullOrEmpty(s));
-		var valid = new List<string>();
-		var invalid = new List<string>();
-		foreach (var url in sanitizedUrls)
-		{
-			if (!url.GetThreadId(out var threadId))
-			{
-				logger.ZLogWarning($"Thread {threadId} is malformed, cannot parse.");
-				continue;
-			}
-
-			var game = dbUser.Games.Find(g => g.GameId == threadId);
-			if (game == null)
-			{
-				invalid.Add(url);
-			}
-			else
-			{
-				valid.Add(url);
-				dbUser.Games.Remove(game);
-				logger.ZLogDebug($"Removed {url} to watchlist of user {user.Id}");
-			}
-		}
-
-		await db.SaveChangesAsync();
-
-		var builder = new StringBuilder();
-		if (valid.Count > 0)
-		{
-			builder.Append("Games removed: ");
-			builder.AppendJoin(" ", valid);
-			builder.AppendLine();
-		}
-
-		if (invalid.Count > 0)
-		{
-			builder.Append("Games didn't exist in watchlist: ");
-			builder.AppendJoin(" ", invalid);
-		}
-
-		await RespondAsync(builder.ToString(), ephemeral: true);
+		var privileged = user is SocketGuildUser guildUser && privilegeChecker.IsPrivileged(guildUser);
+		var (_, response) = await db.UntrackGames(account.Hash, urls, privileged);
+		await RespondAsync(response, ephemeral: true);
 	}
 
 	[SlashCommand("list", "Returns the watchlist. Sends a file if you're watching tons of threads.")]
@@ -136,14 +113,14 @@ public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db
 
 		var user = Context.User;
 
-		if (!await db.Users.AnyAsync(u => u.UserId == user.Id))
+		if (!await db.Users.AnyAsync(u => u.UserId == user.Id && u.Account != null))
 		{
 			logger.ZLogError($"User {user.Id} does not exist, aborting listing.");
 			await RespondAsync("User not found. Use /enable first.", ephemeral: true);
 			return;
 		}
 
-		var games = await db.Users.Where(g => g.UserId == user.Id).Select(u => u.Games).FirstAsync().ConfigureAwait(false);
+		var games = await db.Users.Where(u => u.UserId == user.Id).Select(u => u.Account!.Games).FirstAsync().ConfigureAwait(false);
 
 		var orderedGames = games.OrderByDescending(game => game).ToImmutableList();
 		if (!orderedGames.IsEmpty)

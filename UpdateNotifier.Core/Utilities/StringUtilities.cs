@@ -51,6 +51,11 @@ public static partial class StringUtilities
 
 	public static MemoryStream StringToStream(this string s) => new(Encoding.UTF8.GetBytes(s));
 
+	/// <summary>
+	///     Account hashes are secrets (they authorize watchlist mutations); logs only ever see the first 8 characters.
+	/// </summary>
+	public static string RedactHash(this string hash) => $"{hash[..Math.Min(8, hash.Length)]}…";
+
 	public static string ConvertToUtf8(this string s) => Encoding.UTF8.GetString(Encoding.Default.GetBytes(s));
 
 	public static string HtmlDecode(this string s) => HttpUtility.HtmlDecode(s);

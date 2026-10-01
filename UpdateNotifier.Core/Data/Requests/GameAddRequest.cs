@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using UpdateNotifier.Utilities;
 
 namespace UpdateNotifier.Data.Requests;
 
@@ -8,5 +9,5 @@ public class GameAddRequest
 	[JsonRequired] public string UserHash            { get; set; } = string.Empty;
 	public                bool   DiscordNotification { get; set; } = false;
 
-	public override string ToString() => $"{nameof(ThreadUrl)}: {ThreadUrl}, {nameof(UserHash)}: {UserHash}";
+	public override string ToString() => $"{nameof(ThreadUrl)}: {ThreadUrl}, {nameof(UserHash)}: {UserHash.RedactHash()}";
 }
