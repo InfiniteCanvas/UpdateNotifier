@@ -1,13 +1,10 @@
 using System.Text.Json.Serialization;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using UpdateNotifier.Abstractions;
 using UpdateNotifier.Data;
-using UpdateNotifier.Data.Requests;
 using UpdateNotifier.Bot;
 using UpdateNotifier.Extensions;
-using UpdateNotifier.Services;
 using UpdateNotifier.Utilities;
 using Utf8StringInterpolation;
 using ZLogger;
@@ -69,8 +66,8 @@ internal class Program
     private static void ConfigureWebHost(IWebHostBuilder builder)
         => builder.Configure(app =>
         {
-            app.UseCors("AllowExtension");
             app.UseRouting();
+            app.UseRateLimiter(); // after UseRouting (reads endpoint metadata), before UseEndpoints
             app.UseEndpoints(ConfigureEndPoints);
         });
 
@@ -78,29 +75,7 @@ internal class Program
     {
         endpoints.MapOpenApi();
         endpoints.MapScalarApiReference(options => options.Title = "UpdateNotifier API");
-        endpoints.MapPost("/api/v1/games",
-                async ([FromBody] GameAddRequest addRequest, IEndpointHandlerService handlerService,
-                        CancellationToken ct)
-                    => await handlerService.AddGameAsync(addRequest, ct))
-            .WithName("AddGame")
-            .WithTags("Game")
-            .WithSummary("Add game for tracking")
-            .WithDescription("Create a new watchlist entry for game tracking");
-        endpoints.MapDelete("/api/v1/games",
-                async ([FromBody] GameAddRequest addRequest, IEndpointHandlerService handlerService,
-                        CancellationToken ct)
-                    => await handlerService.RemoveGameAsync(addRequest, ct))
-            .WithName("RemoveGame")
-            .WithTags("Game")
-            .WithSummary("Remove game from tracking")
-            .WithDescription("Remove a watchlist entry from game tracking");
-        endpoints.MapGet("/api/v1/games",
-                async ([FromQuery] string userHash, IEndpointHandlerService handlerService, CancellationToken ct)
-                    => await handlerService.GetWatchedGamesAsync(userHash, ct))
-            .WithName("GetIsWatched")
-            .WithTags("Game")
-            .WithSummary("Get game tracking status")
-            .WithDescription("Get game tracking status");
+        endpoints.MapUpdateNotifierEndpoints();
     }
 
     private static void ConfigureLogging(ILoggingBuilder builder)
@@ -150,26 +125,18 @@ internal class Program
             options =>
             {
                 options.ShouldInclude = description =>
-                    description.RelativePath != null && description.RelativePath.StartsWith("api/v1/game");
+                {
+                    var path = description.RelativePath;
+                    return path != null
+                           && (path.StartsWith("api/v1/game")
+                               || path.StartsWith("api/v1/auth/")
+                               || path.StartsWith("api/v1/me/"));
+                };
             });
         serviceCollection.Configure<JsonOptions>(options =>
         {
             options.SerializerOptions.ReferenceHandler =
                 ReferenceHandler.IgnoreCycles;
-        });
-
-        serviceCollection.AddCors(options =>
-        {
-            options.AddPolicy("AllowExtension",
-                builder =>
-                {
-                    builder
-                        .WithOrigins("https://f95zone.to", "http://localhost:8080", "http://localhost:5000")
-                        .AllowAnyMethod()
-                        .AllowAnyHeader()
-                        .AllowCredentials()
-                        .SetIsOriginAllowedToAllowWildcardSubdomains();
-                });
         });
 
         serviceCollection.AddUpdateNotifierCore();

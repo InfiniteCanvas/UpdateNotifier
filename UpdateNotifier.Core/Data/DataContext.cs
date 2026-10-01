@@ -16,9 +16,10 @@ public sealed class DataContext(ILogger<DataContext> logger, Config config, Game
 {
 	/// <summary>
 	///     Serializes watchlist mutations. Static because the context itself is transient -
-	///     the lock must hold across instances, and it will also guard the later link-merge flow.
+	///     the lock must hold across instances, and it also guards the later link-merge flow.
+	///     Internal so <see cref="Services.WebAuthService" /> can reuse it for link mutations.
 	/// </summary>
-	private static readonly SemaphoreSlim MutationLock = new(1, 1);
+	internal static readonly SemaphoreSlim MutationLock = new(1, 1);
 
 	public DbSet<User>           Users       => Set<User>();
 	public DbSet<Account>        Accounts    => Set<Account>();

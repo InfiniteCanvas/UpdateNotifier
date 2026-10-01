@@ -22,6 +22,8 @@ public sealed class Config
 		XfUser = Environment.GetEnvironmentVariable("XF_USER")       ?? string.Empty;
 		XfSession = Environment.GetEnvironmentVariable("XF_SESSION") ?? string.Empty;
 		SelfHosted = Environment.GetEnvironmentVariable("SELF_HOSTED")?.ToLower() == "true";
+		// default secure: only an explicit "false" (or "true") parses - anything else stays true
+		CookieSecure = !bool.TryParse(Environment.GetEnvironmentVariable("COOKIE_SECURE"), out var cookieSecure) || cookieSecure;
 		DatabasePath = Environment.GetEnvironmentVariable("DATABASE_PATH") ?? "/data/app.db";
 		LogsFolderPath = Environment.GetEnvironmentVariable("LOGS_FOLDER") ?? "/data/logs";
 
@@ -35,6 +37,7 @@ public sealed class Config
 	}
 
 	public bool     SelfHosted          { get; }
+	public bool     CookieSecure        { get; }
 	public string   DatabasePath        { get; }
 	public string   LogsFolderPath      { get; }
 	public string[] RssFeedUrls         { get; }
