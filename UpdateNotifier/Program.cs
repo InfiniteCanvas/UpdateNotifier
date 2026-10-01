@@ -66,6 +66,8 @@ internal class Program
     private static void ConfigureWebHost(IWebHostBuilder builder)
         => builder.Configure(app =>
         {
+            app.UseDefaultFiles(); // SPA bundle lands in wwwroot at publish time (placeholder in dev)
+            app.UseStaticFiles();
             app.UseRouting();
             app.UseRateLimiter(); // after UseRouting (reads endpoint metadata), before UseEndpoints
             app.UseEndpoints(ConfigureEndPoints);
@@ -76,6 +78,7 @@ internal class Program
         endpoints.MapOpenApi();
         endpoints.MapScalarApiReference(options => options.Title = "UpdateNotifier API");
         endpoints.MapUpdateNotifierEndpoints();
+        endpoints.MapFallbackToFile("index.html"); // SPA client-side routing; last so API routes win
     }
 
     private static void ConfigureLogging(ILoggingBuilder builder)

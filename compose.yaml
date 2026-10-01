@@ -16,3 +16,5 @@
       - XF_SESSION=${XF_SESSION}
     volumes:
       - ./data:/data
+    ports:
+      - "8080:8080" # companion website + API; put behind a TLS reverse proxy for login cookies

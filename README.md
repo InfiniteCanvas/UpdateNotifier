@@ -19,9 +19,20 @@ Users can manage personalized game watchlists through Discord commands:
 
 **Companion Extension**  
 A Chromium extension that adds a button to add/remove games from the watchlist.
-Needs the User Hash (get it with `/get_hash`) to work. Optionally sends you a discord notification that a game has been added/removed.
+Needs the User Hash (get it with `/get_hash`) to work. Optionally sends you a discord notification that a game has been added or removed.
 Get it [here!](https://github.com/InfiniteCanvas/Update-Notifier-Chromium-Extension/releases)
 Download the release, unzip and load unpacked.
+
+**Companion Website**  
+The bot also serves a small website (same host/port as the API) where you can create an
+account with just a username and password (no email, no recovery - don't lose it), see your
+tracked games sorted by last update, add/remove games with your hash (same as the extension),
+link your Discord account, and manage/delete your account. Discord and web logins are two
+identities attached to one shared account: one watchlist, one free-tier limit (69 games),
+managed from either surface. Deleting the account (website or `/disable`) removes everything.
+
+> **Extension users:** hashes are now random and were rotated once during the upgrade - if the
+> extension stopped recognizing you, run `/get_hash` again and paste the new hash.
 
 ## Planned Supporter Features
 
@@ -31,14 +42,16 @@ Download the release, unzip and load unpacked.
 
 ## Command Reference
 
-| Command                   | Description                                                                                                    | Example                                                             |
-|---------------------------|----------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------|
-| `/enable`                 | Enables the bot for you (agree to data privacy things). You need to run this before you can use anything else. | `/enable`                                                           |
-| `/disable`                | Disables the bot for you (deletes your data - not reversible)                                                  | `/disable`                                                          |                                                          
-| `/watch [URL1 URL2 ...]`  | Add games to watchlist                                                                                         | `/watch https://f95zone.to/threads/1 https://f95zone.to/threads/2`  |
-| `/remove [URL1 URL2 ...]` | Remove games from watchlist                                                                                    | `/remove https://f95zone.to/threads/1 https://f95zone.to/threads/2` |
-| `/list`                   | Show your watched games                                                                                        | `/list`                                                             |
-| `/get_hash`               | Gets the hash associated with your discord account (needed for plugin)                                         | `/get_hash`                                                         |
+| Command                            | Description                                                                                                    | Example                                                             |
+|------------------------------------|----------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------|
+| `/enable`                          | Enables the bot for you (agree to data privacy things). You need to run this before you can use anything else. | `/enable`                                                           |
+| `/disable`                         | Disables the bot for you (deletes your data **and your linked website account** - not reversible)              | `/disable`                                                          |
+| `/watch [URL1 URL2 ...]`           | Add games to watchlist                                                                                         | `/watch https://f95zone.to/threads/1 https://f95zone.to/threads/2`  |
+| `/unwatch [URL1 URL2 ...]`         | Remove games from watchlist                                                                                    | `/unwatch https://f95zone.to/threads/1`                             |
+| `/import_watchlist`                | Bulk-add games from an attachment (text file of URLs)                                                          | `/import_watchlist`                                                 |
+| `/list`                            | Show your watched games (sorted by last update)                                                                | `/list`                                                             |
+| `/get_hash`                        | Gets the hash associated with your account (needed for the extension)                                          | `/get_hash`                                                         |
+| `/link [code]`                     | Link your Discord to your website account (code comes from the website's "Link Discord" section; merges watchlists) | `/link ABC123...`                                        |
 
 ## Docker Deployment
 
@@ -98,6 +111,7 @@ Environment variables:
 | SELF_HOSTED         | false        | Basically makes you a supporter on your instance                                |
 | XF_USER             | -            | cookies                                                                         |
 | XF_SESSION          | -            | cookies (I had these because I got cucked by ratelimits as anon user for tests) |
+| COOKIE_SECURE       | true         | Mark the website session cookie `Secure`. Only set `false` for plain-HTTP LAN self-hosts. |
 
 ## Headless Mode
 
@@ -108,4 +122,20 @@ for local development and testing without a bot token.
 
 Note: in headless mode nobody can be verified as a supporter, so unless `SELF_HOSTED=true`
 is set, all users are subject to the free watchlist limit.
+
+## Deployment Notes
+
+- **HTTPS for website login**: browsers refuse `Secure` cookies over plain `http://` (except
+  `localhost`), so put the container behind a TLS-terminating reverse proxy if you want the
+  website's login to work. For plain-HTTP LAN self-hosts set `COOKIE_SECURE=false`.
+- **Single instance only**: the app assumes it is the only writer of the SQLite database
+  (watchlist mutation locking and rate limiting are in-process). Do not run two replicas
+  against the same database file.
+- **Migrations**: run automatically at boot. Before applying a pending migration the app
+  copies the database to `<DATABASE_PATH>.pre-migration-<timestamp>` - the hash rotation that
+  ships with this upgrade is irreversible, so keep that backup until you have verified
+  everything works.
+- **Building the website**: the Docker image builds the `web/` frontend automatically (node
+  stage). Building manually? Run `npm ci && npm run build` in `web/` and copy `web/build/`
+  into the host project's `wwwroot/`.
 

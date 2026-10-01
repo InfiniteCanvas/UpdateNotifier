@@ -38,7 +38,8 @@ public sealed class UserManagementCommands(ILogger<UserManagementCommands> logge
 		                          + "2. You will receive direct message notifications when games in your watchlist have updates.\n"
 		                          + "3. Those messages will contain NSFW content.\n"
 		                          + "4. You can remove your data at any time using the `/disable` command.\n"
-		                          + "5. We do not share your data with any third parties.\n\n"
+		                          + "5. We do not share your data with any third parties.\n"
+		                          + "6. Optionally, you can link this account to a website login at any time using /link.\n\n"
 		                          + "Do you accept these terms?")
 		           .WithColor(Color.Blue)
 		           .WithFooter("UpdateNotifier Bot")
