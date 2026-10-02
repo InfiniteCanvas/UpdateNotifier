@@ -206,7 +206,14 @@
 
 	<section class="card" aria-labelledby="extension-title">
 		<h2 id="extension-title">Extension</h2>
-		<p class="card-sub">The browser extension button uses this hash to add threads to your watchlist.</p>
+		<p class="card-sub">
+			The browser extension button uses this hash to add threads to your watchlist. Don't have the extension?
+			<a
+				href="https://github.com/InfiniteCanvas/Update-Notifier-Chromium-Extension/releases"
+				target="_blank"
+				rel="noopener noreferrer">Get it here</a
+			>.
+		</p>
 		<CopyField value={session.me?.hash ?? ''} label="Extension hash" />
 		<div class="row">
 			<button class="btn" onclick={regenerate} disabled={regenPending}>
