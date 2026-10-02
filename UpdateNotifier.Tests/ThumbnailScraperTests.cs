@@ -20,7 +20,7 @@ public sealed class ThumbnailScraperTests(DatabaseFixture fixture)
 	private const string AbsoluteSrcHtml = """
 		<html>
 			<body>
-				<div class="lbContainer">
+				<div class="lbContainer lbContainer--inline" title="library_header.png">
 					<img src="https://attachments.f95zone.to/attachments/header-png.123/" />
 				</div>
 			</body>
@@ -30,7 +30,7 @@ public sealed class ThumbnailScraperTests(DatabaseFixture fixture)
 	private const string RelativeSrcHtml = """
 		<html>
 			<body>
-				<div class="lbContainer">
+				<div class="lbContainer lbContainer--inline">
 					<img src="/attachments/header-png.123/" />
 				</div>
 			</body>
@@ -40,8 +40,41 @@ public sealed class ThumbnailScraperTests(DatabaseFixture fixture)
 	private const string DataSrcHtml = """
 		<html>
 			<body>
-				<div class="lbContainer">
+				<div class="lbContainer lbContainer--inline">
 					<img data-src="https://attachments.f95zone.to/attachments/data-src-banner.png" />
+				</div>
+			</body>
+		</html>
+		""";
+
+	// mirrors real thread markup: bare lbContainer also sits on the whole-thread block and the
+	// whole-post wrapper, and the first img inside those is the poster's avatar, not the banner
+	private const string AvatarBeforeBannerHtml = """
+		<html>
+			<body>
+				<div class="block-container lbContainer" data-xf-init="lightbox select-to-quote" data-lb-id="thread-137720">
+					<article class="message message-threadStarterPost">
+						<div class="message-avatar-wrapper">
+							<img src="/data/avatars/m/0/3.jpg?1535844153" alt="7767" class="avatar-u3-m" />
+						</div>
+						<div class="message-userContent lbContainer js-lbContainer"></div>
+					</article>
+				</div>
+				<div class="lbContainer lbContainer--inline" title="library_header.png">
+					<img src="https://attachments.f95zone.to/2023/10/3041394_library_header.png" class="bbImage" alt="library_header.png" />
+				</div>
+			</body>
+		</html>
+		""";
+
+	private const string AvatarInlineHtml = """
+		<html>
+			<head>
+				<meta property="og:image" content="https://f95zone.to/data/covers/thread/o/137/137720.jpg" />
+			</head>
+			<body>
+				<div class="lbContainer lbContainer--inline">
+					<img src="https://f95zone.to/data/avatars/m/801/801262.jpg?1743172371" />
 				</div>
 			</body>
 		</html>
@@ -125,10 +158,22 @@ public sealed class ThumbnailScraperTests(DatabaseFixture fixture)
 	[Fact]
 	public void ExtractThumbnailUrl_SrcLongerThan255Chars_ReturnsNull()
 	{
-		var oversized = "<html><body><div class=\"lbContainer\"><img src=\"https://attachments.f95zone.to/"
+		var oversized = "<html><body><div class=\"lbContainer lbContainer--inline\"><img src=\"https://attachments.f95zone.to/"
 		                + new string('a', 300) + "\" /></div></body></html>";
 
 		Assert.Null(Extract(oversized));
+	}
+
+	[Fact]
+	public void ExtractThumbnailUrl_AvatarBeforeInlineBanner_SkipsAvatarTakesBanner()
+	{
+		Assert.Equal("https://attachments.f95zone.to/2023/10/3041394_library_header.png", Extract(AvatarBeforeBannerHtml));
+	}
+
+	[Fact]
+	public void ExtractThumbnailUrl_AvatarSrcInInlineContainer_RejectedFallsBackToOgImage()
+	{
+		Assert.Equal("https://f95zone.to/data/covers/thread/o/137/137720.jpg", Extract(AvatarInlineHtml));
 	}
 
 	// ---- ProcessItemAsync ---------------------------------------------------------------------

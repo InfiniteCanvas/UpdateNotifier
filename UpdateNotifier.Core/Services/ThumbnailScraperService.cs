@@ -97,13 +97,15 @@ public sealed class ThumbnailScraperService(
 	}
 
 	/// <summary>
-	///     The banner lives in the first lightbox container (its title attribute names the header file).
-	///     XenForo lazy-loading can pair a placeholder src with the real URL in data-src, so both are
-	///     tried before falling back to og:image.
+	///     The banner lives in the first INLINE lightbox (lbContainer--inline — its title attribute names
+	///     the header file). The bare lbContainer token is not specific enough: XenForo also puts it on
+	///     whole-post and whole-thread wrappers (message-userContent, the thread block itself), whose
+	///     first descendant img is the poster's avatar. XenForo lazy-loading can pair a placeholder src
+	///     with the real URL in data-src, so both are tried before falling back to og:image.
 	/// </summary>
 	internal static string? ExtractThumbnailUrl(HtmlDocument document, Uri pageUrl)
 	{
-		var container = document.DocumentNode.SelectSingleNode("//div[contains(concat(' ', normalize-space(@class), ' '), ' lbContainer ')]");
+		var container = document.DocumentNode.SelectSingleNode("//div[contains(concat(' ', normalize-space(@class), ' '), ' lbContainer--inline ')]");
 		var img = container?.SelectSingleNode(".//img");
 		var candidates = new[]
 		{
@@ -146,19 +148,25 @@ public sealed class ThumbnailScraperService(
 		if (Uri.TryCreate(src, UriKind.Absolute, out var absolute) && absolute.Scheme is "http" or "https")
 		{
 			url = absolute.ToString();
-			return true;
 		}
-
-		if (Uri.TryCreate(src, UriKind.Relative, out var relative))
+		else if (Uri.TryCreate(src, UriKind.Relative, out var relative))
 		{
 			var resolved = new Uri(pageUrl, relative);
-			if (resolved.Scheme is "http" or "https" && resolved.ToString().Length <= 255)
-			{
-				url = resolved.ToString();
-				return true;
-			}
+			if (resolved.Scheme is not ("http" or "https") || resolved.ToString().Length > 255) return false;
+			url = resolved.ToString();
+		}
+		else
+		{
+			return false;
 		}
 
-		return false;
+		// avatars live under /data/avatars/ and are never the game banner
+		if (url.Contains("/data/avatars/", StringComparison.OrdinalIgnoreCase))
+		{
+			url = string.Empty;
+			return false;
+		}
+
+		return true;
 	}
 }
