@@ -30,7 +30,8 @@
       # enable if your entrypoint uses a cert resolver:
       # - traefik.http.routers.updatenotifier-api.tls.certresolver=${TRAEFIK_CERTRESOLVER}
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
+      # no curl/wget in the runtime image — probe /health over bash's /dev/tcp
+      test: ["CMD", "bash", "-c", 'exec 3<>/dev/tcp/127.0.0.1/8080 && printf "GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n" >&3 && grep -q " 200 " <&3']
       interval: 30s
       timeout: 5s
       retries: 3
