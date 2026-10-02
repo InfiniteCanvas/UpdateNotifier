@@ -83,7 +83,14 @@ public sealed class Config
 	public string                   InternalApiKey          { get; }
 	public IReadOnlyList<IPNetwork> InternalApiAllowedCidrs { get; }
 
-	public const int FREE_USER_LIMIT = 69;
+	private const int DefaultFreeUserLimit = 69;
+
+	// static on purpose: enforcement sites (DataContext, web endpoints, tests) read it
+	// without holding a Config instance; FREE_USER_LIMIT env var overrides (must be > 0)
+	public static int FREE_USER_LIMIT { get; } =
+		int.TryParse(Environment.GetEnvironmentVariable("FREE_USER_LIMIT"), out var limit) && limit > 0
+			? limit
+			: DefaultFreeUserLimit;
 
 	public override string ToString()
 		=> $"{nameof(DatabasePath)}: {DatabasePath}, {nameof(LogsFolderPath)}: {LogsFolderPath}, {nameof(UpdateCheckInterval)}: {UpdateCheckInterval}, {nameof(RssFeedUrls)}: {RssFeedUrls}";
