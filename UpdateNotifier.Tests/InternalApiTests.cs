@@ -367,7 +367,7 @@ public sealed class InternalApiTests(DatabaseFixture db, InternalApiFixture api)
     // ---- watch --------------------------------------------------------------------------------
 
     [Fact]
-    public async Task Watch_UnknownUser_AnswersEnableFirst()
+    public async Task Watch_UnknownUser_AnswersNotFound()
     {
         const ulong unknown = UserIdBase + 41;
 
@@ -375,13 +375,13 @@ public sealed class InternalApiTests(DatabaseFixture db, InternalApiFixture api)
                 new WatchRequest(unknown, [ThreadUrl(GameIdBase + 41)], false)))
         {
             Assert.Equal(HttpStatusCode.NotFound, watch.StatusCode);
-            Assert.Equal("User not found. Use /enable first.", await ErrorAsync(watch));
+            Assert.Equal("User not found.", await ErrorAsync(watch));
         }
 
         using (var list = await api.Client.GetAsync($"/api/internal/watch/{unknown}"))
         {
             Assert.Equal(HttpStatusCode.NotFound, list.StatusCode);
-            Assert.Equal("User not found. Use /enable first.", await ErrorAsync(list));
+            Assert.Equal("User not found.", await ErrorAsync(list));
         }
     }
 

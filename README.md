@@ -45,7 +45,6 @@ managed from either surface. Deleting the account (website or `/disable`) remove
 
 | Command                            | Description                                                                                                    | Example                                                             |
 |------------------------------------|----------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------|
-| `/enable`                          | Enables the bot for you (agree to data privacy things). You need to run this before you can use anything else. | `/enable`                                                           |
 | `/disable`                         | Disables the bot for you (deletes your data **and your linked website account** - not reversible)              | `/disable`                                                          |
 | `/watch [URL1 URL2 ...]`           | Add games to watchlist                                                                                         | `/watch https://f95zone.to/threads/1 https://f95zone.to/threads/2`  |
 | `/unwatch [URL1 URL2 ...]`         | Remove games from watchlist                                                                                    | `/unwatch https://f95zone.to/threads/1`                             |
@@ -53,6 +52,9 @@ managed from either surface. Deleting the account (website or `/disable`) remove
 | `/list`                            | Show your watched games (sorted by last update)                                                                | `/list`                                                             |
 | `/get_hash`                        | Gets the hash associated with your account (needed for the extension)                                          | `/get_hash`                                                         |
 | `/link [code]`                     | Link your Discord to your website account (code comes from the website's "Link Discord" section; merges watchlists) | `/link ABC123...`                                        |
+
+Tracking a game works out of the box - your Discord user ID is stored to manage the watchlist
+(and DM you updates). `/disable` deletes all of your data at any time.
 
 ## Architecture
 

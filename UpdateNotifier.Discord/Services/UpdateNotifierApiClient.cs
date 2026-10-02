@@ -11,7 +11,7 @@ namespace UpdateNotifier.Services;
 #pragma warning disable CS9113
 
 /// <summary>
-///     The API answered 404: the Discord user has no account and must run /enable first.
+///     The API answered 404: the Discord user has no account yet; the bot auto-registers one on first /watch or /link.
 ///     Carries the server's user-facing message from its {"error": ...} body.
 /// </summary>
 public sealed class UserNotFoundException(string message) : Exception(message);

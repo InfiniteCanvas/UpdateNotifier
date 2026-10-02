@@ -4,6 +4,7 @@ using Discord.WebSocket;
 using Microsoft.Extensions.Logging;
 using UpdateNotifier.Communication;
 using UpdateNotifier.Services;
+using UpdateNotifier.Utilities;
 using ZLogger;
 
 namespace UpdateNotifier.Commands;
@@ -17,9 +18,22 @@ public sealed class LinkCommands(ILogger<LinkCommands> logger, UpdateNotifierApi
 		logger.ZLogDebug($"User {Context.User.Id} is trying to link their Discord account to a website account.");
 
 		LinkConsumeResponse outcome;
+		var registeredAccount = false;
 		try
 		{
 			outcome = await api.ConsumeLinkCodeAsync(code, Context.User.Id, Context.User.GlobalName ?? Context.User.Username);
+
+			// first-time bot users have no account yet: auto-register (implicit consent) and retry once.
+			// The link code is only consumed on the success paths, so the first attempt burns nothing.
+			if (outcome.Kind == LinkOutcomeKind.NotEnabled)
+			{
+				var added = await api.AddUserAsync(Context.User.Id, Context.User.GlobalName ?? Context.User.Username);
+				if (added)
+				{
+					registeredAccount = true;
+					outcome = await api.ConsumeLinkCodeAsync(code, Context.User.Id, Context.User.GlobalName ?? Context.User.Username);
+				}
+			}
 		}
 		catch (Exception e)
 		{
@@ -35,7 +49,7 @@ public sealed class LinkCommands(ILogger<LinkCommands> logger, UpdateNotifierApi
 
 		var (title, color, description) = outcome.Kind switch
 		{
-			LinkOutcomeKind.NotEnabled => ("Not Enabled", Color.Blue, $"{outcome.Message}\nPlease run `/enable` first, then try again."),
+			LinkOutcomeKind.NotEnabled => ("Not Enabled", Color.Blue, outcome.Message),
 			LinkOutcomeKind.Invalid    => ("Invalid Code", Color.Red, outcome.Message),
 			LinkOutcomeKind.Conflict   => ("Already Linked", Color.Red, outcome.Message),
 			_                          => ("Account Linked", Color.Green, outcome.Message)
@@ -47,6 +61,9 @@ public sealed class LinkCommands(ILogger<LinkCommands> logger, UpdateNotifierApi
 		                         .WithColor(color)
 		                         .Build(),
 		                   ephemeral: true);
+
+		if (registeredAccount && outcome.Kind is LinkOutcomeKind.Linked or LinkOutcomeKind.Merged or LinkOutcomeKind.AlreadyLinked)
+			await FollowupAsync(embed: PrivacyNotice.Build(), ephemeral: true);
 
 		// same success kinds as LinkOutcome.IsSuccess: Linked, Merged or AlreadyLinked
 		if (outcome.Kind is LinkOutcomeKind.Linked or LinkOutcomeKind.Merged or LinkOutcomeKind.AlreadyLinked)

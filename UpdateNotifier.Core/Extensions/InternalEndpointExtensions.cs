@@ -161,7 +161,7 @@ public static class InternalEndpointExtensions
 			async ([FromBody] WatchRequest request, DataContext db, ILogger<InternalEndpointsLog> logger, CancellationToken ct) =>
 			{
 				if (await FindAccountAsync(db, request.DiscordId, ct) is not { } account)
-					return UseEnableFirst();
+					return UserNotFound();
 
 				var (success, response) = await db.TrackGames(account.Hash, request.Urls, request.Privileged, ct);
 				logger.ZLogDebug($"Watch for {request.DiscordId} [{success}]: {response}");
@@ -174,7 +174,7 @@ public static class InternalEndpointExtensions
 			async ([FromBody] WatchRequest request, DataContext db, ILogger<InternalEndpointsLog> logger, CancellationToken ct) =>
 			{
 				if (await FindAccountAsync(db, request.DiscordId, ct) is not { } account)
-					return UseEnableFirst();
+					return UserNotFound();
 
 				var (success, response) = await db.UntrackGames(account.Hash, request.Urls, request.Privileged, ct);
 				logger.ZLogDebug($"Unwatch for {request.DiscordId} [{success}]: {response}");
@@ -185,7 +185,7 @@ public static class InternalEndpointExtensions
 			async (ulong discordId, DataContext db, CancellationToken ct) =>
 			{
 				if (await FindAccountAsync(db, discordId, ct) is not { } account)
-					return UseEnableFirst();
+					return UserNotFound();
 
 				// LastUpdated descending, like the bot's OrderByDescending(game => game):
 				// Game's IComparable compares LastUpdated
@@ -219,14 +219,14 @@ public static class InternalEndpointExtensions
 			});
 	}
 
-	/// <summary>The account linked to a Discord snowflake, or null when the user is not enabled.</summary>
+	/// <summary>The account linked to a Discord snowflake, or null when the user has no account.</summary>
 	private static async Task<Account?> FindAccountAsync(DataContext db, ulong discordId, CancellationToken ct)
 		=> (await db.Users.Include(u => u.Account)
 		          .FirstOrDefaultAsync(u => u.UserId == discordId, ct))?.Account;
 
-	/// <summary>The "no account" answer the bot maps to its old /enable-first replies.</summary>
-	private static IResult UseEnableFirst()
-		=> Results.Json(new { error = "User not found. Use /enable first." }, statusCode: StatusCodes.Status404NotFound);
+	/// <summary>The no-account answer for internal endpoints; the bot auto-registers on tracking commands and maps this to friendly text.</summary>
+	private static IResult UserNotFound()
+		=> Results.Json(new { error = "User not found." }, statusCode: StatusCodes.Status404NotFound);
 }
 
 /// <summary>Log category for the internal endpoints - a static class cannot be an ILogger type argument.</summary>

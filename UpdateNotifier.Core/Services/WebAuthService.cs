@@ -43,7 +43,7 @@ public enum LinkOutcomeKind
 	/// <summary>The Discord user already points at the issuing account (idempotent success).</summary>
 	AlreadyLinked,
 
-	/// <summary>No Discord user exists for the snowflake - the bot requires /enable first.</summary>
+	/// <summary>No Discord user exists for the snowflake - the bot auto-registers one before consuming, so this is only a race.</summary>
 	NotEnabled,
 
 	/// <summary>Missing, expired or already-consumed code - deliberately indistinguishable.</summary>
@@ -67,7 +67,7 @@ public sealed record LinkOutcome(LinkOutcomeKind Kind, string Message, int Games
 		=> new(LinkOutcomeKind.AlreadyLinked, "This Discord account is already linked to that web account.");
 
 	public static LinkOutcome NotEnabled()
-		=> new(LinkOutcomeKind.NotEnabled, "Discord notifications are not enabled for your account - run /enable on Discord first.");
+		=> new(LinkOutcomeKind.NotEnabled, "Your Discord account is not registered with the bot yet - please try again.");
 
 	public static LinkOutcome Invalid()
 		=> new(LinkOutcomeKind.Invalid, "That code is invalid or expired.");
@@ -268,9 +268,8 @@ public sealed partial class WebAuthService(DataContext db, ILogger<WebAuthServic
 			if (targetAccountId is not ulong targetId)
 				return LinkOutcome.Invalid();
 
-			// the bot creates the user through /enable; linking cannot substitute for it.
-			// checked BEFORE consuming the code, otherwise a NotEnabled user burns their code
-			// and the "run /enable, then try again" advice becomes impossible to follow
+			// the bot auto-registers the user before consuming the code, so a missing user here is
+			// only a race. still checked BEFORE consuming, otherwise the race would burn the code
 			var user = await db.Users.Include(u => u.Account)
 			                  .FirstOrDefaultAsync(u => u.UserId == discordSnowflake, ct);
 			if (user is null)
@@ -309,7 +308,7 @@ public sealed partial class WebAuthService(DataContext db, ILogger<WebAuthServic
 			if (user is null) return false;
 
 			// deletes ONLY the Discord link: the account, web login and watchlist survive;
-			// re-linking requires /enable on the bot again
+			// re-linking requires /link on the bot again
 			db.Users.Remove(user);
 			await db.SaveChangesAsync(ct);
 

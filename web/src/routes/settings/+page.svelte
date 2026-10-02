@@ -91,7 +91,7 @@
 	async function unlinkDiscord(): Promise<void> {
 		const ok = await dialog?.confirm({
 			title: 'Unlink Discord?',
-			body: 'The Discord identity row will be removed from your account, and re-linking requires running /enable in the bot again.',
+			body: 'The Discord identity row will be removed from your account, and you can re-link at any time by running /link in the bot again.',
 			confirmLabel: 'Unlink'
 		});
 		if (!ok) return;

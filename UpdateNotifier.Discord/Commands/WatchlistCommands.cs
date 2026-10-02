@@ -28,12 +28,10 @@ public class WatchlistCommands(ILogger<WatchlistCommands> logger, UpdateNotifier
 
 		try
 		{
-			var (_, response) = await api.WatchAsync(user.Id, urls, privilegeChecker.IsPrivileged(user));
+			var (newAccount, response) = await WatchWithAutoRegisterAsync(user.Id, user.GlobalName ?? user.Username, urls,
+				privilegeChecker.IsPrivileged(user));
 			await RespondAsync(response, ephemeral: true);
-		}
-		catch (UserNotFoundException e)
-		{
-			await RespondAsync(e.Message, ephemeral: true);
+			if (newAccount) await FollowupAsync(embed: PrivacyNotice.Build(), ephemeral: true);
 		}
 		catch (Exception e)
 		{
@@ -65,12 +63,10 @@ public class WatchlistCommands(ILogger<WatchlistCommands> logger, UpdateNotifier
 			var urlsCombined = await client.GetStringAsync(attachment.Url);
 			var urls = urlsCombined.Split('\n');
 
-			var (_, response) = await api.WatchAsync(user.Id, urls, privilegeChecker.IsPrivileged(user));
+			var (newAccount, response) = await WatchWithAutoRegisterAsync(user.Id, user.GlobalName ?? user.Username, urls,
+				privilegeChecker.IsPrivileged(user));
 			await RespondAsync(response, ephemeral: true);
-		}
-		catch (UserNotFoundException e)
-		{
-			await RespondAsync(e.Message, ephemeral: true);
+			if (newAccount) await FollowupAsync(embed: PrivacyNotice.Build(), ephemeral: true);
 		}
 		catch (Exception e)
 		{
@@ -90,10 +86,9 @@ public class WatchlistCommands(ILogger<WatchlistCommands> logger, UpdateNotifier
 			var (_, response) = await api.UnwatchAsync(user.Id, urls, privileged);
 			await RespondAsync(response, ephemeral: true);
 		}
-		catch (UserNotFoundException e)
+		catch (UserNotFoundException)
 		{
-			logger.ZLogError($"User {user.Id} does not exist, aborting removing from watchlist.");
-			await RespondAsync(e.Message, ephemeral: true);
+			await RespondAsync("You're not watching anything — no data is stored for you yet. Use `/watch` to get started.", ephemeral: true);
 		}
 		catch (Exception e)
 		{
@@ -136,15 +131,36 @@ public class WatchlistCommands(ILogger<WatchlistCommands> logger, UpdateNotifier
 				await RespondAsync("Empty watchlist :(", ephemeral: true);
 			}
 		}
-		catch (UserNotFoundException e)
+		catch (UserNotFoundException)
 		{
-			logger.ZLogError($"User {user.Id} does not exist, aborting listing.");
-			await RespondAsync(e.Message, ephemeral: true);
+			await RespondAsync("Empty watchlist :(", ephemeral: true);
 		}
 		catch (Exception e)
 		{
 			logger.ZLogError(e, $"[{e.GetType()}]Failed to list watchlist for {user.Id}");
 			await RespondAsync("Something went wrong while getting your watchlist.", ephemeral: true);
+		}
+	}
+
+	/// <summary>
+	///     Watches for a user, auto-registering the account on first use (implicit consent).
+	///     Returns true in the first tuple slot only when the account was just created.
+	/// </summary>
+	private async Task<(bool NewAccount, string Response)> WatchWithAutoRegisterAsync(ulong userId, string username,
+		IReadOnlyList<string> urls, bool privileged)
+	{
+		try
+		{
+			var (_, response) = await api.WatchAsync(userId, urls, privileged);
+			return (false, response);
+		}
+		catch (UserNotFoundException)
+		{
+			var added = await api.AddUserAsync(userId, username);
+			if (!added) throw new HttpRequestException("Account auto-registration failed.");
+
+			var (_, response) = await api.WatchAsync(userId, urls, privileged);
+			return (true, response);
 		}
 	}
 }
