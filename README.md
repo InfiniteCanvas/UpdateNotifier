@@ -1,7 +1,10 @@
 # Update Notifier Bot
 
 A Discord bot that watches the f95zone RSS feeds for game updates and DMs you when something on your watchlist gets
-one. That's it. That's the bot.
+one.
+
+> **Disclaimer:** the recent updates were 99% vibed. The tests pass, but if something breaks in a weird way - that's
+> probably why.
 
 ## What it does
 
