@@ -1,0 +1,2 @@
+# Shell scripts must stay LF or Git Bash refuses to run them (autocrlf=true would CRLF them)
+*.sh text eol=lf
