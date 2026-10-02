@@ -148,6 +148,7 @@
 			{#each Array(3) as _}
 				<li class="skeleton-row">
 					<div class="skeleton-block skeleton-tick"></div>
+					<div class="skeleton-block skeleton-thumb"></div>
 					<div class="skeleton-block skeleton-line wide"></div>
 					<div class="skeleton-block skeleton-age"></div>
 				</li>

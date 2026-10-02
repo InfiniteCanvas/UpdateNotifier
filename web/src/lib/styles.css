@@ -401,8 +401,8 @@ input[readonly] {
 
 .game-row {
 	display: grid;
-	grid-template-columns: 3px minmax(0, 1fr) auto auto;
-	grid-template-areas: 'tick main age action';
+	grid-template-columns: 3px 96px minmax(0, 1fr) auto auto;
+	grid-template-areas: 'tick thumb main age action';
 	align-items: center;
 	gap: 0 14px;
 	padding: 13px 2px 13px 0;
@@ -431,6 +431,30 @@ input[readonly] {
 
 .tick[data-fresh='cooling'] {
 	background: var(--fresh-3);
+}
+
+/* Decorative banner link — tabindex=-1, so no focus styles; the title link
+   next to it carries navigation. The box itself doubles as the placeholder. */
+.thumb {
+	grid-area: thumb;
+	display: block;
+	width: 100%;
+	aspect-ratio: 16 / 9;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	overflow: hidden;
+	background: var(--panel-2);
+}
+
+.thumb img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.thumb:hover {
+	text-decoration: none;
 }
 
 .game-main {
@@ -532,7 +556,7 @@ input[readonly] {
 
 .skeleton-row {
 	display: grid;
-	grid-template-columns: 3px minmax(0, 1fr) auto;
+	grid-template-columns: 3px 96px minmax(0, 1fr) auto;
 	gap: 0 14px;
 	align-items: center;
 	padding: 15px 2px 15px 0;
@@ -560,6 +584,11 @@ input[readonly] {
 	width: 3px;
 	align-self: stretch;
 	border-radius: 2px;
+}
+
+.skeleton-thumb {
+	width: 96px;
+	aspect-ratio: 16 / 9;
 }
 
 .skeleton-line {
@@ -785,11 +814,15 @@ input[readonly] {
 	}
 
 	.game-row {
-		grid-template-columns: 3px minmax(0, 1fr) auto;
+		grid-template-columns: 3px 72px minmax(0, 1fr) auto;
 		grid-template-areas:
-			'tick main main'
-			'. age action';
+			'tick thumb main main'
+			'. thumb age action';
 		row-gap: 6px;
+	}
+
+	.skeleton-row {
+		grid-template-columns: 3px 72px minmax(0, 1fr) auto;
 	}
 
 	.filter-row {

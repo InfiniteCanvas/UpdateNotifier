@@ -60,7 +60,7 @@ public sealed class FakePrivilegeChecker(bool privileged) : IPrivilegeChecker
 
 public static class RssFeed
 {
-	public static SyndicationFeed MakeFeed(params (ulong GameId, string Title, DateTime Updated)[] items)
+	public static SyndicationFeed MakeFeed(params (ulong GameId, string Title, DateTime Updated, string? Thumbnail)[] items)
 	{
 		var builder = new StringBuilder();
 		builder.Append("""
@@ -71,15 +71,20 @@ public static class RssFeed
 		                   <link>https://f95zone.to/</link>
 		                   <description>Fixture feed</description>
 		               """);
-		foreach (var (gameId, title, updated) in items)
+		foreach (var (gameId, title, updated, thumbnail) in items)
+		{
+			// CDATA shields the img tag from the XML parser, so the URL needs no XML escaping.
+			var description = thumbnail is null ? string.Empty : $"<description><![CDATA[<img src=\"{thumbnail}\" alt=\"\" />]]></description>";
 			builder.Append($"""
 			                    <item>
 			                      <title>{title}</title>
+			                      {description}
 			                      <link>https://f95zone.to/threads/{gameId}/</link>
 			                      <guid>https://f95zone.to/threads/thread.{gameId}/</guid>
 			                      <pubDate>{updated:R}</pubDate>
 			                    </item>
 			                    """);
+		}
 		builder.Append("""
 		                 </channel>
 		               </rss>

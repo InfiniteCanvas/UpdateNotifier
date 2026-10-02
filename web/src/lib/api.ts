@@ -15,6 +15,7 @@ export interface GameEntry {
 	title: string;
 	url: string;
 	lastUpdated: string; // ISO timestamp
+	thumbnailUrl: string | null; // wide 1600x400 banner image; null when unknown
 }
 
 export interface LinkCodeInfo {

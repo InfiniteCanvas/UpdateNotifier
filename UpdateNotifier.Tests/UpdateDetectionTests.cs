@@ -38,7 +38,7 @@ public sealed class UpdateDetectionTests(DatabaseFixture fixture)
 		{
 			var monitor = CreateMonitor(db);
 			monitor.GamesUpdatedEvent += games => raised = games;
-			await monitor.CheckFeed(RssFeed.MakeFeed((gameId, "New Title", newDate)), CancellationToken.None);
+			await monitor.CheckFeed(RssFeed.MakeFeed((gameId, "New Title", newDate, null)), CancellationToken.None);
 		}
 
 		Assert.NotNull(raised);
@@ -64,7 +64,7 @@ public sealed class UpdateDetectionTests(DatabaseFixture fixture)
 		{
 			var monitor = CreateMonitor(db);
 			monitor.GamesUpdatedEvent += games => raised = games;
-			await monitor.CheckFeed(RssFeed.MakeFeed((gameId, "Brand New", date)), CancellationToken.None);
+			await monitor.CheckFeed(RssFeed.MakeFeed((gameId, "Brand New", date, null)), CancellationToken.None);
 		}
 
 		Assert.Null(raised);
@@ -95,7 +95,7 @@ public sealed class UpdateDetectionTests(DatabaseFixture fixture)
 		{
 			var monitor = CreateMonitor(db);
 			monitor.GamesUpdatedEvent += games => raised = games;
-			await monitor.CheckFeed(RssFeed.MakeFeed((gameId, "Same Title", date)), CancellationToken.None);
+			await monitor.CheckFeed(RssFeed.MakeFeed((gameId, "Same Title", date, null)), CancellationToken.None);
 		}
 
 		Assert.Null(raised);
@@ -104,6 +104,136 @@ public sealed class UpdateDetectionTests(DatabaseFixture fixture)
 		{
 			var game = await db.Games.SingleAsync(g => g.GameId == gameId);
 			Assert.Equal(date, game.LastUpdated);
+		}
+	}
+
+	[Fact]
+	public async Task NewGameWithThumbnail_StoresThumbnailUrl()
+	{
+		const ulong gameId = IdBase + 31;
+		var date = new DateTime(2025, 6, 15, 9, 0, 0, DateTimeKind.Utc);
+		const string thumbnail = "https://example.com/banners/31.png";
+
+		await using (var db = fixture.CreateContext())
+		{
+			var monitor = CreateMonitor(db);
+			await monitor.CheckFeed(RssFeed.MakeFeed((gameId, "Fresh Game", date, thumbnail)), CancellationToken.None);
+		}
+
+		await using (var db = fixture.CreateContext())
+		{
+			var game = await db.Games.SingleAsync(g => g.GameId == gameId);
+			Assert.Equal(thumbnail, game.ThumbnailUrl);
+		}
+	}
+
+	[Fact]
+	public async Task NewerFeedItemWithThumbnail_UpdatesThumbnailUrl()
+	{
+		const ulong gameId = IdBase + 41;
+		var oldDate = new DateTime(2025, 4, 1, 0, 0, 0, DateTimeKind.Utc);
+		var newDate = oldDate.AddDays(3);
+		const string oldThumbnail = "https://example.com/banners/41-old.png";
+		const string newThumbnail = "https://example.com/banners/41-new.png";
+
+		await using (var db = fixture.CreateContext())
+		{
+			db.Games.Add(new Game(gameId, "Old Title", oldDate, $"https://f95zone.to/threads/{gameId}", oldThumbnail));
+			await db.SaveChangesAsync();
+		}
+
+		await using (var db = fixture.CreateContext())
+		{
+			var monitor = CreateMonitor(db);
+			await monitor.CheckFeed(RssFeed.MakeFeed((gameId, "New Title", newDate, newThumbnail)), CancellationToken.None);
+		}
+
+		await using (var db = fixture.CreateContext())
+		{
+			var game = await db.Games.SingleAsync(g => g.GameId == gameId);
+			Assert.Equal(newDate, game.LastUpdated);
+			Assert.Equal("New Title", game.Title);
+			Assert.Equal(newThumbnail, game.ThumbnailUrl);
+		}
+	}
+
+	[Fact]
+	public async Task UnchangedFeedItemWithThumbnail_BackfillsThumbnailWithoutEvent()
+	{
+		const ulong gameId = IdBase + 51;
+		var date = new DateTime(2025, 5, 5, 16, 45, 0, DateTimeKind.Utc);
+		const string thumbnail = "https://example.com/banners/51.png";
+
+		await using (var db = fixture.CreateContext())
+		{
+			db.Games.Add(new Game(gameId, "Same Title", date, $"https://f95zone.to/threads/{gameId}"));
+			await db.SaveChangesAsync();
+		}
+
+		List<Game>? raised = null;
+		await using (var db = fixture.CreateContext())
+		{
+			var monitor = CreateMonitor(db);
+			monitor.GamesUpdatedEvent += games => raised = games;
+			await monitor.CheckFeed(RssFeed.MakeFeed((gameId, "Same Title", date, thumbnail)), CancellationToken.None);
+		}
+
+		Assert.Null(raised);
+
+		await using (var db = fixture.CreateContext())
+		{
+			var game = await db.Games.SingleAsync(g => g.GameId == gameId);
+			Assert.Equal(thumbnail, game.ThumbnailUrl);
+			Assert.Equal(date, game.LastUpdated);
+			Assert.Equal("Same Title", game.Title);
+		}
+	}
+
+	[Fact]
+	public async Task NewerFeedItemWithoutThumbnail_PreservesThumbnailUrl()
+	{
+		const ulong gameId = IdBase + 61;
+		var oldDate = new DateTime(2025, 7, 7, 0, 0, 0, DateTimeKind.Utc);
+		var newDate = oldDate.AddDays(1);
+		const string thumbnail = "https://example.com/banners/61.png";
+
+		await using (var db = fixture.CreateContext())
+		{
+			db.Games.Add(new Game(gameId, "Old Title", oldDate, $"https://f95zone.to/threads/{gameId}", thumbnail));
+			await db.SaveChangesAsync();
+		}
+
+		await using (var db = fixture.CreateContext())
+		{
+			var monitor = CreateMonitor(db);
+			await monitor.CheckFeed(RssFeed.MakeFeed((gameId, "New Title", newDate, null)), CancellationToken.None);
+		}
+
+		await using (var db = fixture.CreateContext())
+		{
+			var game = await db.Games.SingleAsync(g => g.GameId == gameId);
+			Assert.Equal(newDate, game.LastUpdated);
+			Assert.Equal("New Title", game.Title);
+			Assert.Equal(thumbnail, game.ThumbnailUrl);
+		}
+	}
+
+	[Fact]
+	public async Task NewGameWithoutThumbnail_LeavesThumbnailUrlNull()
+	{
+		const ulong gameId = IdBase + 71;
+		var date = new DateTime(2025, 8, 8, 10, 15, 0, DateTimeKind.Utc);
+
+		await using (var db = fixture.CreateContext())
+		{
+			var monitor = CreateMonitor(db);
+			await monitor.CheckFeed(RssFeed.MakeFeed((gameId, "No Banner", date, null)), CancellationToken.None);
+		}
+
+		await using (var db = fixture.CreateContext())
+		{
+			var game = await db.Games.SingleAsync(g => g.GameId == gameId);
+			Assert.Null(game.ThumbnailUrl);
 		}
 	}
 }

@@ -275,10 +275,10 @@ public static class WebEndpointExtensions
 		=> db.Watchlist.Where(w => w.AccountId == accountId)
 		      .Select(w => w.Game!)
 		      .OrderByDescending(g => g.LastUpdated)
-		      .Select(g => new WatchedGameDto(g.GameId, g.Title, g.Url, g.LastUpdated))
+		      .Select(g => new WatchedGameDto(g.GameId, g.Title, g.Url, g.LastUpdated, g.ThumbnailUrl))
 		      .ToListAsync(ct);
 
-	internal sealed record WatchedGameDto(ulong GameId, string Title, string Url, DateTime LastUpdated);
+	internal sealed record WatchedGameDto(ulong GameId, string Title, string Url, DateTime LastUpdated, string? ThumbnailUrl);
 
 	private static bool CookieSecure(HttpContext http)
 		=> http.RequestServices.GetRequiredService<Config>().CookieSecure;

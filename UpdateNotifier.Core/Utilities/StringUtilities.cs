@@ -49,6 +49,26 @@ public static partial class StringUtilities
 		}
 	}
 
+	[GeneratedRegex(@"<img\b[^>]*?src\s*=\s*([""'])(?<url>https?://[^""']+)\1", _DEFAULT_COMPILED_ONCE_OPTIONS, "en-US")]
+	private static partial Regex ThumbnailRegex();
+
+	/// <summary>
+	///     F95zone embeds each item's banner image as an HTML img tag inside the RSS description CDATA;
+	///     this pulls the first http(s) src out of that snippet.
+	/// </summary>
+	public static bool GetThumbnailUrl(this string? html, out string thumbnailUrl)
+	{
+		var match = ThumbnailRegex().Match(html ?? string.Empty);
+		if (!match.Success)
+		{
+			thumbnailUrl = string.Empty;
+			return false;
+		}
+
+		thumbnailUrl = HttpUtility.HtmlDecode(match.Groups["url"].Value);
+		return true;
+	}
+
 	public static MemoryStream StringToStream(this string s) => new(Encoding.UTF8.GetBytes(s));
 
 	/// <summary>

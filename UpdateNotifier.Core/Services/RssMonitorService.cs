@@ -85,10 +85,18 @@ public sealed class RssMonitorService(
 		foreach (var dbGame in toCheck)
 		{
 			var feedGame = feed.First(g => g.GameId == dbGame.GameId);
-			if (feedGame <= dbGame) continue;
-			dbGame.LastUpdated = feedGame.LastUpdated;
-			dbGame.Title = feedGame.Title;
-			toUpdate.Add(dbGame);
+			if (feedGame > dbGame)
+			{
+				dbGame.LastUpdated = feedGame.LastUpdated;
+				dbGame.Title = feedGame.Title;
+				dbGame.ThumbnailUrl = feedGame.ThumbnailUrl ?? dbGame.ThumbnailUrl;
+				toUpdate.Add(dbGame);
+			}
+			// not an update, but the feed carries a thumbnail the row lacks: backfill silently so no update notifications fire
+			else if (dbGame.ThumbnailUrl is null && feedGame.ThumbnailUrl is not null)
+			{
+				dbGame.ThumbnailUrl = feedGame.ThumbnailUrl;
+			}
 		}
 
 		if (!toAdd.IsEmpty)
@@ -140,7 +148,9 @@ public sealed class RssMonitorService(
 		{
 			if (!item.Id.GetSanitizedUrl(out var sanitizedUrl)) continue;
 			if (!sanitizedUrl.GetThreadId(out var threadId)) continue;
-			yield return new Game(title: item.Title.Text.HtmlDecode(), url: sanitizedUrl, lastUpdated: item.PublishDate.DateTime, gameId: threadId);
+			var summary = item.Summary?.Text ?? string.Empty;
+			var thumbnailUrl = summary.GetThumbnailUrl(out var thumbnail) ? thumbnail : null;
+			yield return new Game(title: item.Title.Text.HtmlDecode(), url: sanitizedUrl, lastUpdated: item.PublishDate.DateTime, gameId: threadId, thumbnailUrl: thumbnailUrl);
 		}
 	}
 }

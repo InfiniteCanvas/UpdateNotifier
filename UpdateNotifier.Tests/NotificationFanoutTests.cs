@@ -69,7 +69,7 @@ public sealed class NotificationFanoutTests(DatabaseFixture fixture)
 			var notifications = new NotificationService(NullLogger<NotificationService>.Instance, monitor, sender);
 			await notifications.StartAsync(CancellationToken.None);
 
-			await monitor.CheckFeed(RssFeed.MakeFeed((gameId, "Title", newDate)), CancellationToken.None);
+			await monitor.CheckFeed(RssFeed.MakeFeed((gameId, "Title", newDate, null)), CancellationToken.None);
 
 			await WaitForSendsAsync(sender, expected: 2);
 			await notifications.StopAsync(CancellationToken.None);
@@ -104,7 +104,7 @@ public sealed class NotificationFanoutTests(DatabaseFixture fixture)
 			var notifications = new NotificationService(NullLogger<NotificationService>.Instance, monitor, sender);
 			await notifications.StartAsync(CancellationToken.None);
 
-			await monitor.CheckFeed(RssFeed.MakeFeed((gameId, "Title", newDate)), CancellationToken.None);
+			await monitor.CheckFeed(RssFeed.MakeFeed((gameId, "Title", newDate, null)), CancellationToken.None);
 
 			await WaitForSendsAsync(sender, expected: 1);
 			await notifications.StopAsync(CancellationToken.None);
@@ -141,7 +141,7 @@ public sealed class NotificationFanoutTests(DatabaseFixture fixture)
 			var notifications = new NotificationService(NullLogger<NotificationService>.Instance, monitor, sender);
 			await notifications.StartAsync(CancellationToken.None);
 
-			await monitor.CheckFeed(RssFeed.MakeFeed((gameId, "Title", newDate)), CancellationToken.None);
+			await monitor.CheckFeed(RssFeed.MakeFeed((gameId, "Title", newDate, null)), CancellationToken.None);
 
 			// the throwing send happens first; the loop must survive it and deliver the second one
 			using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));

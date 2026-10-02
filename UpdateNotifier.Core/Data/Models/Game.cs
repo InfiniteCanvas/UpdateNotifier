@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace UpdateNotifier.Data.Models;
 
 [Table("Games")]
-public class Game(ulong gameId, string title, DateTime lastUpdated, string url)
+public class Game(ulong gameId, string title, DateTime lastUpdated, string url, string? thumbnailUrl = null)
 	: IComparable<Game>, IComparable, IEquatable<Game>
 {
 	[Key] public ulong GameId { get; init; } = gameId;
@@ -12,6 +12,7 @@ public class Game(ulong gameId, string title, DateTime lastUpdated, string url)
 	[MaxLength(255)] public string     Title       { get; set; }  = title;
 	public                  DateTime   LastUpdated { get; set; }  = lastUpdated;
 	[MaxLength(255)] public string     Url         { get; init; } = url;
+	[MaxLength(255)] public string?    ThumbnailUrl { get; set; } = thumbnailUrl;
 	[NotMapped]      public List<Account> Watchers  { get; set; }  = [];
 
 	public int CompareTo(object? obj)

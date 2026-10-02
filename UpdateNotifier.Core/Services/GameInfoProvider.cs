@@ -35,6 +35,12 @@ public partial class GameInfoProvider(ILogger<GameInfoProvider> logger, IHttpCli
 
 			var metaTag = document.DocumentNode.SelectSingleNode("//meta[@property='og:title']");
 			var title = metaTag.GetAttributeValue("content", "Title Not Found");
+			var imageTag = document.DocumentNode.SelectSingleNode("//meta[@property='og:image']");
+			var thumbnailUrl = imageTag is not null
+			                   && Uri.TryCreate(imageTag.GetAttributeValue("content", string.Empty), UriKind.Absolute, out var imageUri)
+			                   && imageUri.Scheme is "http" or "https"
+				                   ? imageUri.ToString()
+				                   : null;
 			var updatedMatch = _updated.Match(document.Text).Groups[2];
 			var updated = updatedMatch.Success switch
 			{
@@ -43,7 +49,7 @@ public partial class GameInfoProvider(ILogger<GameInfoProvider> logger, IHttpCli
 			};
 			// just pray it works lmao
 			url.GetThreadId(out var gameId);
-			var game = new Game(title: title, lastUpdated: DateTime.Parse(updated), url: url, gameId: gameId);
+			var game = new Game(title: title, lastUpdated: DateTime.Parse(updated), url: url, gameId: gameId, thumbnailUrl: thumbnailUrl);
 			logger.ZLogDebug($"Retrieved: {game}");
 			return game;
 		}
