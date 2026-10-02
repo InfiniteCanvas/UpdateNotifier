@@ -24,7 +24,8 @@ Get it [here!](https://github.com/InfiniteCanvas/Update-Notifier-Chromium-Extens
 Download the release, unzip and load unpacked.
 
 **Companion Website**  
-The bot also serves a small website (same host/port as the API) where you can create an
+A small website is served by the `web` container, on the same hostname as the API (Traefik
+routes everything that is not `/api`, `/openapi` or `/scalar` to it). There you can create an
 account with just a username and password (no email, no recovery - don't lose it), see your
 tracked games sorted by last update, add/remove games with your hash (same as the extension),
 link your Discord account, and manage/delete your account. Discord and web logins are two
@@ -53,89 +54,109 @@ managed from either surface. Deleting the account (website or `/disable`) remove
 | `/get_hash`                        | Gets the hash associated with your account (needed for the extension)                                          | `/get_hash`                                                         |
 | `/link [code]`                     | Link your Discord to your website account (code comes from the website's "Link Discord" section; merges watchlists) | `/link ABC123...`                                        |
 
+## Architecture
+
+The app is split into three containers behind your own Traefik (Docker label provider):
+
+- **api** - the web API, the RSS monitor and the SQLite database (single owner), plus the
+  durable pending-notification queue.
+- **bot** - the Discord gateway and slash commands. It polls the api for pending
+  notifications every `NOTIFICATION_POLL_INTERVAL` seconds and acks them after delivery,
+  and pushes the privileged-user cache every `PRIVILEGE_SYNC_INTERVAL` minutes.
+- **web** - an nginx container serving the static SPA build (no proxying; `/api` goes
+  straight to the api via Traefik).
+
+Notifications survive bot restarts: they are queued in the api's database and delivered
+at-least-once when a bot polls; after 10 failed attempts a notification is dead-lettered.
+
+Security model for the internal endpoints (`/api/internal/*`): Traefik never routes them
+publicly (the api router rule excludes the prefix), callers must present the shared
+`X-Internal-Api-Key` header, and their IP must be inside a CIDR allowlist (default:
+loopback + RFC1918 + Tailscale CGNAT + IPv6 ULA; override with `INTERNAL_API_ALLOWED_CIDRS`).
+
 ## Docker Deployment
 
-Set these in your Docker deployment if you want to host your own bot. Adjust to your own system.
-When binding a mount, make sure to set permissions with `sudo chown -R 1654:1654 /path/to/folder`
+Prerequisites: an existing Traefik instance with the Docker label provider and an external
+`traefik` network (create it once with `docker network create traefik` if you don't have one).
 
-If you build from source:
+Set these in `.env` next to `compose.yaml`:
 
-```yaml
-services:
-  update-notifier:
-    image: update-notifier
-    build:
-      context: .
-      dockerfile: UpdateNotifier/Dockerfile
-    environment:
-      - DISCORD_BOT_TOKEN=${TOKEN}
-      - DISCORD_GUILD_ID=${GUILD_ID}
-      - DATABASE_PATH=/data/app.db
-      - LOGS_FOLDER=/data/logs
-      - SELF_HOSTED=true # enables supporter features
-      - RSS_UPDATE_INTERVAL=5 # in minutes
-    volumes:
-      - ./data:/data
+| Key                    | Required | Notes                                                          |
+|------------------------|----------|----------------------------------------------------------------|
+| TOKEN                  | yes      | Discord bot token                                              |
+| GUILD_ID               | yes      | Your Discord server                                            |
+| XF_USER / XF_SESSION   | no       | f95zone cookies                                                |
+| INTERNAL_API_KEY       | yes      | Shared api/bot key: generate with `openssl rand -hex 32`       |
+| DOMAIN                 | yes      | Public hostname Traefik routes to the web+api services         |
+| SELF_HOSTED            | no       | `true` enables supporter features                              |
+| RSS_UPDATE_INTERVAL    | no       | RSS check interval in minutes (default 5)                      |
+| TRAEFIK_NETWORK        | no       | Traefik's docker network name (default `traefik`)              |
+| TRAEFIK_ENTRYPOINT     | no       | Traefik entrypoint (default `websecure`)                       |
+| TRAEFIK_CERTRESOLVER   | no       | Uncomment the tls label(s) in `compose.yaml` if you use one    |
+
+Then:
+
+```bash
+docker compose up -d --build
 ```
 
-If you pull the image:
+Routing: Traefik sends `/api`, `/openapi` and `/scalar` (everything *except* `/api/internal`)
+to the **api** container, and everything else on the host to the static **web** container.
+The **bot** never goes through Traefik - it talks to the api directly over the compose
+network (`API_BASE_URL=http://api:8080`) with the shared internal key.
 
-```yaml
-services:
-  update-notifier:
-    container_name: update-notifier
-    image: infinitecanvas/update-notifier:latest
-    environment:
-      - DISCORD_BOT_TOKEN=${TOKEN}
-      - DISCORD_GUILD_ID=${GUILD_ID}
-      - DATABASE_PATH=/data/app.db
-      - LOGS_FOLDER=/data/logs
-      - SELF_HOSTED=true
-      - RSS_UPDATE_INTERVAL=5 # in minutes
-    volumes:
-      - ./data:/data
-```
+When binding the `./data` mount, make sure to set permissions with
+`sudo chown -R 1654:1654 /path/to/folder`.
 
 ## Configuration
 
 Environment variables:
 
-| Variable            | Default      | Description                                                                     |
-|---------------------|--------------|---------------------------------------------------------------------------------|
-| DISCORD_BOT_TOKEN   | -            | Your discord bot token                                                          |
-| DISABLE_DISCORD     | false        | Run without the Discord bot (RSS monitor + API only, DMs are no-ops)            |
-| DISCORD_GUILD_ID    | -            | Your discord server                                                             |
-| DATABASE_PATH       | /data/app.db | SQLite db location                                                              |
-| LOGS_FOLDER         | /data/logs   | Folder where logs are put                                                       |
-| RSS_UPDATE_INTERVAL | 5            | How often it checks the RSS feeds (in minutes)                                  |
-| SELF_HOSTED         | false        | Basically makes you a supporter on your instance                                |
-| XF_USER             | -            | cookies                                                                         |
-| XF_SESSION          | -            | cookies (I had these because I got cucked by ratelimits as anon user for tests) |
-| COOKIE_SECURE       | true         | Mark the website session cookie `Secure`. Only set `false` for plain-HTTP LAN self-hosts. |
+| Variable                   | Default          | Container | Description                                                                     |
+|----------------------------|------------------|-----------|---------------------------------------------------------------------------------|
+| DISCORD_BOT_TOKEN          | -                | bot       | Your discord bot token                                                          |
+| DISCORD_GUILD_ID           | -                | bot       | Your discord server                                                             |
+| DATABASE_PATH              | /data/app.db     | api       | SQLite db location                                                              |
+| LOGS_FOLDER                | /data/logs       | api       | Folder where logs are put                                                       |
+| RSS_UPDATE_INTERVAL        | 5                | api       | How often it checks the RSS feeds (in minutes)                                  |
+| SELF_HOSTED                | false            | api, bot  | Basically makes you a supporter on your instance                                |
+| XF_USER                    | -                | api       | cookies                                                                         |
+| XF_SESSION                 | -                | api       | cookies (I had these because I got cucked by ratelimits as anon user for tests) |
+| COOKIE_SECURE              | true             | api       | Mark the website session cookie `Secure`. Only set `false` for plain-HTTP LAN self-hosts. |
+| INTERNAL_API_KEY           | - (required)     | api, bot  | Shared key for the `/api/internal` endpoints (`openssl rand -hex 32`)           |
+| INTERNAL_API_ALLOWED_CIDRS | loopback + RFC1918 + CGNAT + ULA | api | Optional comma-separated CIDR allowlist for `/api/internal`          |
+| API_BASE_URL               | http://api:8080  | bot       | Where the bot reaches the api (compose network)                                 |
+| NOTIFICATION_POLL_INTERVAL | 5                | bot       | Seconds between pending-notification polls                                      |
+| PRIVILEGE_SYNC_INTERVAL    | 15               | bot       | Minutes between privileged-user cache syncs                                     |
+| DOMAIN                     | - (required)     | compose   | Public hostname Traefik routes to the web+api services                          |
 
-## Headless Mode
+## Running without the bot
 
-Set `DISABLE_DISCORD=true` (or leave `DISCORD_BOT_TOKEN` empty) to run without the bot:
-the RSS monitor and the HTTP API for the browser extension still work, but no Discord
-client connects and every DM notification is logged and dropped instead of sent. Useful
-for local development and testing without a bot token.
-
-Note: in headless mode nobody can be verified as a supporter, so unless `SELF_HOSTED=true`
-is set, all users are subject to the free watchlist limit.
+Simply don't start the bot container (`docker compose up -d api web`, or comment the `bot`
+service out): the API, RSS monitor and website keep working, and DM notifications
+accumulate in the api's pending queue - they are delivered when a bot comes back online.
+There is no `DISABLE_DISCORD` anymore; the bot is a separate container now.
 
 ## Deployment Notes
 
+- **Public entry is Traefik only**: no ports are published; the api and web containers join
+  your external `traefik` network and are routed by label rules. Configure the hostname via
+  `DOMAIN` (and `TRAEFIK_NETWORK` / `TRAEFIK_ENTRYPOINT` / `TRAEFIK_CERTRESOLVER` if your
+  setup needs them).
 - **HTTPS for website login**: browsers refuse `Secure` cookies over plain `http://` (except
-  `localhost`), so put the container behind a TLS-terminating reverse proxy if you want the
-  website's login to work. For plain-HTTP LAN self-hosts set `COOKIE_SECURE=false`.
-- **Single instance only**: the app assumes it is the only writer of the SQLite database
+  `localhost`), so serve the stack through a TLS-terminating Traefik entrypoint if you want
+  the website's login to work. For plain-HTTP LAN self-hosts set `COOKIE_SECURE=false`.
+- **Single api replica only**: the api is the single owner/writer of the SQLite database
   (watchlist mutation locking and rate limiting are in-process). Do not run two replicas
   against the same database file.
-- **Migrations**: run automatically at boot. Before applying a pending migration the app
+- **Migrations**: run automatically at api boot. Before applying a pending migration the app
   copies the database to `<DATABASE_PATH>.pre-migration-<timestamp>` - the hash rotation that
   ships with this upgrade is irreversible, so keep that backup until you have verified
   everything works.
-- **Building the website**: the Docker image builds the `web/` frontend automatically (node
-  stage). Building manually? Run `npm ci && npm run build` in `web/` and copy `web/build/`
-  into the host project's `wwwroot/`.
+- **Website build**: the SPA is built inside the web image (node stage into nginx); the old
+  manual `npm run build` + copy-into-`wwwroot/` flow is gone - the api serves no static
+  files anymore.
+- **Breaking change**: this replaces the previous single-container compose file. The stack
+  is now api/bot/web behind Traefik, `DISABLE_DISCORD` no longer exists (stop the bot
+  container instead), and port 8080 is no longer published.
 

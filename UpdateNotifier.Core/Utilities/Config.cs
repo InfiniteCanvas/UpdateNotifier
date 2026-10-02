@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.Extensions.Logging;
 using ZLogger;
 
@@ -33,6 +34,40 @@ public sealed class Config
 		else
 			UpdateCheckInterval = TimeSpan.FromMinutes(5);
 
+		InternalApiKey = Environment.GetEnvironmentVariable("INTERNAL_API_KEY") ?? string.Empty;
+		if (string.IsNullOrEmpty(InternalApiKey))
+			logger.ZLogWarning($"INTERNAL_API_KEY is not set - the internal API endpoints will reject every caller");
+
+		// the internal API's CIDR allowlist: an explicit override or the private/container defaults
+		var cidrs = Environment.GetEnvironmentVariable("INTERNAL_API_ALLOWED_CIDRS");
+		if (!string.IsNullOrEmpty(cidrs))
+		{
+			var networks = new List<IPNetwork>();
+			foreach (var entry in cidrs.Split(','))
+			{
+				if (IPNetwork.TryParse(entry.Trim(), out var network))
+					networks.Add(network);
+				else
+					logger.ZLogWarning($"Ignoring malformed CIDR '{entry.Trim()}' from INTERNAL_API_ALLOWED_CIDRS");
+			}
+
+			InternalApiAllowedCidrs = networks;
+		}
+		else
+		{
+			InternalApiAllowedCidrs =
+			[
+				IPNetwork.Parse("127.0.0.0/8"),    // IPv4 loopback
+				IPNetwork.Parse("::1/128"),        // IPv6 loopback
+				IPNetwork.Parse("10.0.0.0/8"),     // RFC1918 private
+				IPNetwork.Parse("172.16.0.0/12"),  // RFC1918 private
+				IPNetwork.Parse("192.168.0.0/16"), // RFC1918 private
+				IPNetwork.Parse("100.64.0.0/10"),  // CGNAT (Tailscale)
+				IPNetwork.Parse("fd00::/8")        // IPv6 ULA
+			];
+		}
+
+		logger.ZLogInformation($"Internal API trusts CIDRs: {string.Join(", ", InternalApiAllowedCidrs)}");
 		logger.ZLogInformation($"Config: {this}");
 	}
 
@@ -44,6 +79,9 @@ public sealed class Config
 	public TimeSpan UpdateCheckInterval { get; }
 	public string   XfUser              { get; }
 	public string   XfSession           { get; }
+
+	public string                   InternalApiKey          { get; }
+	public IReadOnlyList<IPNetwork> InternalApiAllowedCidrs { get; }
 
 	public const int FREE_USER_LIMIT = 69;
 

@@ -1,14 +1,14 @@
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
-using UpdateNotifier.Abstractions;
 using UpdateNotifier.Data;
-using UpdateNotifier.Bot;
 using UpdateNotifier.Extensions;
 using UpdateNotifier.Utilities;
 using Utf8StringInterpolation;
 using ZLogger;
 using ZLogger.Providers;
+using IPNetwork = System.Net.IPNetwork;
 using JsonOptions = Microsoft.AspNetCore.Http.Json.JsonOptions;
 
 namespace UpdateNotifier;
@@ -17,11 +17,9 @@ internal class Program
 {
     private static async Task Main(string[] args)
     {
-        var headless = IsHeadless();
-
         var host = Host.CreateDefaultBuilder(args)
             .UseDefaultServiceProvider(options => options.ValidateOnBuild = true)
-            .ConfigureServices(services => ConfigureServices(services, headless))
+            .ConfigureServices(ConfigureServices)
             .ConfigureLogging(ConfigureLogging)
             .ConfigureHostOptions(options =>
             {
@@ -49,25 +47,31 @@ internal class Program
             }
 
             await db.Database.MigrateAsync();
-
-            if (headless)
-                scope.ServiceProvider.GetRequiredService<ILogger<Program>>()
-                    .ZLogWarning(
-                        $"DISABLE_DISCORD={Environment.GetEnvironmentVariable("DISABLE_DISCORD") ?? "unset"}, DISCORD_BOT_TOKEN missing or empty - running headless: the Discord bot will not start and DMs are no-ops.");
         }
 
         await host.RunAsync();
     }
 
-    private static bool IsHeadless()
-        => Environment.GetEnvironmentVariable("DISABLE_DISCORD")?.ToLower() == "true"
-           || string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("DISCORD_BOT_TOKEN"));
-
     private static void ConfigureWebHost(IWebHostBuilder builder)
         => builder.Configure(app =>
         {
-            app.UseDefaultFiles(); // SPA bundle lands in wwwroot at publish time (placeholder in dev)
-            app.UseStaticFiles();
+            // Trust X-Forwarded-* headers only from the proxy/container networks below (docker &
+            // traefik bridges, Tailscale): per-IP rate limiting stays correct behind Traefik while
+            // public clients - whose socket IP is not a known proxy - cannot spoof the header.
+            var forwardedHeaders = new ForwardedHeadersOptions
+            {
+                ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+            };
+            forwardedHeaders.KnownIPNetworks.Clear();
+            forwardedHeaders.KnownIPNetworks.Add(IPNetwork.Parse("127.0.0.0/8"));    // IPv4 loopback
+            forwardedHeaders.KnownIPNetworks.Add(IPNetwork.Parse("::1/128"));        // IPv6 loopback
+            forwardedHeaders.KnownIPNetworks.Add(IPNetwork.Parse("10.0.0.0/8"));     // RFC1918 private
+            forwardedHeaders.KnownIPNetworks.Add(IPNetwork.Parse("172.16.0.0/12"));  // RFC1918 private (docker bridges)
+            forwardedHeaders.KnownIPNetworks.Add(IPNetwork.Parse("192.168.0.0/16")); // RFC1918 private
+            forwardedHeaders.KnownIPNetworks.Add(IPNetwork.Parse("100.64.0.0/10"));  // CGNAT (Tailscale)
+            forwardedHeaders.KnownIPNetworks.Add(IPNetwork.Parse("fd00::/8"));       // IPv6 ULA
+            app.UseForwardedHeaders(forwardedHeaders);
+
             app.UseRouting();
             app.UseCors(); // parameterless: honors per-endpoint RequireCors metadata (extension endpoints only)
             app.UseRateLimiter(); // after UseRouting (reads endpoint metadata), before UseEndpoints
@@ -79,7 +83,7 @@ internal class Program
         endpoints.MapOpenApi();
         endpoints.MapScalarApiReference(options => options.Title = "UpdateNotifier API");
         endpoints.MapUpdateNotifierEndpoints();
-        endpoints.MapFallbackToFile("index.html"); // SPA client-side routing; last so API routes win
+        endpoints.MapInternalEndpoints();
     }
 
     private static void ConfigureLogging(ILoggingBuilder builder)
@@ -123,7 +127,7 @@ internal class Program
             })
             .SetMinimumLevel(LogLevel.Trace);
 
-    private static void ConfigureServices(IServiceCollection serviceCollection, bool headless)
+    private static void ConfigureServices(IServiceCollection serviceCollection)
     {
         serviceCollection.AddOpenApi("v1",
             options =>
@@ -144,12 +148,5 @@ internal class Program
         });
 
         serviceCollection.AddUpdateNotifierCore();
-
-        if (headless)
-            serviceCollection.AddSingleton<IDmSender, NoopDmSender>()
-                .AddSingleton<IPrivilegeChecker>(provider =>
-                    new InlinePrivilegeChecker(provider.GetRequiredService<Config>().SelfHosted));
-        else
-            serviceCollection.AddDiscordBot();
     }
 }

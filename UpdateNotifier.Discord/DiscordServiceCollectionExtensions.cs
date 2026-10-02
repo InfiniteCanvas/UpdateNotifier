@@ -3,17 +3,17 @@ using Discord.Interactions;
 using Discord.Rest;
 using Discord.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
-using UpdateNotifier.Abstractions;
 using UpdateNotifier.Commands;
 using UpdateNotifier.Services;
+using UpdateNotifier.Utilities;
 
 namespace UpdateNotifier.Bot;
 
 public static class DiscordServiceCollectionExtensions
 {
 	/// <summary>
-	///     Wires the Discord bot: gateway/interaction clients, slash commands, DM delivery and privilege checks.
-	///     Must only be called when a bot token is available; the host registers no-ops otherwise.
+	///     Wires the standalone bot process: gateway/interaction clients, slash commands, DM delivery,
+	///     the internal api client, the notification poller and the privilege syncer.
 	/// </summary>
 	public static IServiceCollection AddDiscordBot(this IServiceCollection services)
 	{
@@ -35,6 +35,13 @@ public static class DiscordServiceCollectionExtensions
 		};
 		var discordRestConfig = new DiscordRestConfig { LogLevel = LogSeverity.Info, DefaultRetryMode = RetryMode.AlwaysRetry };
 
+		services.AddHttpClient<UpdateNotifierApiClient>((provider, client) =>
+		{
+			var botConfig = provider.GetRequiredService<BotConfig>();
+			client.BaseAddress = new Uri(botConfig.ApiBaseUrl);
+			client.DefaultRequestHeaders.Add("X-Internal-Api-Key", botConfig.InternalApiKey);
+		});
+
 		return services.AddSingleton(discordConfig)
 		               .AddSingleton<DiscordSocketClient>()
 		               .AddSingleton(discordRestConfig)
@@ -43,11 +50,13 @@ public static class DiscordServiceCollectionExtensions
 		               .AddSingleton(provider => new InteractionService(provider.GetRequiredService<DiscordSocketClient>(),
 		                                                                provider.GetRequiredService<InteractionServiceConfig>()))
 		               .AddSingleton<BotConfig>()
-		               .AddSingleton<IDmSender, DiscordDmSender>()
+		               .AddSingleton<Config>()
+		               .AddSingleton<DiscordDmSender>()
 		               .AddSingleton<DiscordPrivilegeChecker>()
-		               .AddSingleton<IPrivilegeChecker>(provider => provider.GetRequiredService<DiscordPrivilegeChecker>())
 		               .AddHostedService(provider => provider.GetRequiredService<DiscordPrivilegeChecker>())
 		               .AddSingleton<CommandHandler>()
-		               .AddHostedService<DiscordBotService>();
+		               .AddHostedService<DiscordBotService>()
+		               .AddHostedService<NotificationPollingService>()
+		               .AddHostedService<PrivilegeSyncer>();
 	}
 }

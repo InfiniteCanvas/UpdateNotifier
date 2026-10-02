@@ -12,14 +12,23 @@ namespace UpdateNotifier.Bot;
 public class DiscordPrivilegeChecker(Config config, BotConfig botConfig, ILogger<DiscordPrivilegeChecker> logger, DiscordRestClient restClient)
 	: BackgroundService, IPrivilegeChecker
 {
+	private readonly TaskCompletionSource<RestGuild> _guildReady = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
 	private RestGuild? _guild;
 
-	public bool IsPrivileged(SocketGuildUser user)
+	/// <summary>
+	///     Completes once <see cref="ExecuteAsync" /> has logged in and resolved the guild; the
+	///     privilege syncer awaits this instead of racing the startup login.
+	/// </summary>
+	public Task<RestGuild> GuildReady => _guildReady.Task;
+
+	// works for SocketGuildUser (commands) and RestGuildUser (privilege syncer) alike
+	public bool IsPrivileged(IGuildUser user)
 		=> config.SelfHosted
 		|| user.GuildPermissions.Administrator
 		|| user.GuildPermissions.ManageRoles
 		|| user.GuildPermissions.ModerateMembers
-		|| user.Roles.Any(r => botConfig.PrivilegedRoleIds.Contains(r.Id));
+		|| user.RoleIds.Any(r => botConfig.PrivilegedRoleIds.Contains(r));
 
 	// make it cache privileged userIds in db later
 	public async ValueTask<bool> IsPrivilegedAsync(ulong userId, CancellationToken ct = default)
@@ -59,6 +68,7 @@ public class DiscordPrivilegeChecker(Config config, BotConfig botConfig, ILogger
 		_guild = await restClient.GetGuildAsync(botConfig.GuildId);
 		logger.ZLogInformation($"Connected to server[{botConfig.GuildId}]: {_guild.Name}");
 		logger.ZLogInformation($"Privileged role ids: {string.Join(' ', botConfig.PrivilegedRoleIds)}");
+		_guildReady.TrySetResult(_guild);
 
 		await Task.Delay(-1, stoppingToken);
 	}

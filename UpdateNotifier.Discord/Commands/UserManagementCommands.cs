@@ -1,15 +1,13 @@
 ﻿using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using UpdateNotifier.Data;
-using UpdateNotifier.Data.Models;
+using UpdateNotifier.Services;
 using ZLogger;
 
 namespace UpdateNotifier.Commands;
 
-public sealed class UserManagementCommands(ILogger<UserManagementCommands> logger, DataContext db)
+public sealed class UserManagementCommands(ILogger<UserManagementCommands> logger, UpdateNotifierApiClient api)
 	: InteractionModuleBase<SocketInteractionContext>
 {
 	[SlashCommand("enable", "Enable the bot's functions by accepting the Terms of Service")]
@@ -18,9 +16,9 @@ public sealed class UserManagementCommands(ILogger<UserManagementCommands> logge
 		var userId = Context.User.Id;
 
 		// Check if user already exists and has accepted ToS
-		var userExists = db.UserExists(userId);
+		var user = await api.GetUserAsync(userId);
 
-		if (userExists)
+		if (user.Exists)
 		{
 			await RespondAsync(embed: new EmbedBuilder()
 			                         .WithTitle("Already Enabled")
@@ -61,18 +59,18 @@ public sealed class UserManagementCommands(ILogger<UserManagementCommands> logge
 	{
 		var userId = Context.User.Id;
 
-		// Add user to database (creates the account + the Discord identity link)
-		var success = db.AddUser(userId, Context.User.GlobalName ?? Context.User.Username);
+		// Add user (creates the account + the Discord identity link on the api side)
+		var success = await api.AddUserAsync(userId, Context.User.GlobalName ?? Context.User.Username);
 
 		if (success)
 		{
 			await RespondAsync(embeds:
 			                   [
 				                   new EmbedBuilder()
-					                  .WithTitle("Terms Accepted")
-					                  .WithDescription("Nice. You can now use all bot functions and add games to your watchlist.")
-					                  .WithColor(Color.Green)
-					                  .Build(),
+				                  .WithTitle("Terms Accepted")
+				                  .WithDescription("Nice. You can now use all bot functions and add games to your watchlist.")
+				                  .WithColor(Color.Green)
+				                  .Build(),
 			                   ],
 			                   ephemeral: true);
 			logger.ZLogInformation($"User {Context.User.GlobalName} added to the database.");
@@ -82,10 +80,10 @@ public sealed class UserManagementCommands(ILogger<UserManagementCommands> logge
 			await RespondAsync(embeds:
 			                   [
 				                   new EmbedBuilder()
-					                  .WithTitle("Error")
-					                  .WithDescription("There was an error enabling your account. Please try again later.")
-					                  .WithColor(Color.Red)
-					                  .Build(),
+				                  .WithTitle("Error")
+				                  .WithDescription("There was an error enabling your account. Please try again later.")
+				                  .WithColor(Color.Red)
+				                  .Build(),
 			                   ],
 			                   ephemeral: true);
 			logger.ZLogError($"Error adding user {Context.User.GlobalName} to the database.");
@@ -98,10 +96,10 @@ public sealed class UserManagementCommands(ILogger<UserManagementCommands> logge
 		await RespondAsync(embeds:
 		                   [
 			                   new EmbedBuilder()
-				                  .WithTitle("Terms Declined")
-				                  .WithDescription("You have declined the Terms of Service. Bot functions will not be enabled for your account.")
-				                  .WithColor(Color.Red)
-				                  .Build(),
+			                  .WithTitle("Terms Declined")
+			                  .WithDescription("You have declined the Terms of Service. Bot functions will not be enabled for your account.")
+			                  .WithColor(Color.Red)
+			                  .Build(),
 		                   ],
 		                   ephemeral: true);
 		logger.ZLogDebug($"User {Context.User.GlobalName} declined ToS.");
@@ -111,7 +109,8 @@ public sealed class UserManagementCommands(ILogger<UserManagementCommands> logge
 	public async Task DisableBot()
 	{
 		var userId = Context.User.Id;
-		if (!db.UserExists(userId))
+		var user = await api.GetUserAsync(userId);
+		if (!user.Exists)
 		{
 			await RespondAsync("This user doesn't exist.", ephemeral: true);
 			return;
@@ -143,17 +142,17 @@ public sealed class UserManagementCommands(ILogger<UserManagementCommands> logge
 	{
 		var userId = Context.User.Id;
 
-		var success = await db.RemoveUser(userId);
+		var success = await api.RemoveUserAsync(userId);
 
 		if (success)
 		{
 			await RespondAsync(embeds:
 			                   [
 				                   new EmbedBuilder()
-					                  .WithTitle("User deleted.")
-					                  .WithDescription("RIP.")
-					                  .WithColor(Color.Red)
-					                  .Build(),
+				                  .WithTitle("User deleted.")
+				                  .WithDescription("RIP.")
+				                  .WithColor(Color.Red)
+				                  .Build(),
 			                   ],
 			                   ephemeral: true);
 			logger.ZLogDebug($"User {Context.User.GlobalName} is disabled and all user data was deleted.");
@@ -163,10 +162,10 @@ public sealed class UserManagementCommands(ILogger<UserManagementCommands> logge
 			await RespondAsync(embeds:
 			                   [
 				                   new EmbedBuilder()
-					                  .WithTitle("Error")
-					                  .WithDescription("There was an error deleting your account. Please try again later.")
-					                  .WithColor(Color.Red)
-					                  .Build(),
+				                  .WithTitle("Error")
+				                  .WithDescription("There was an error deleting your account. Please try again later.")
+				                  .WithColor(Color.Red)
+				                  .Build(),
 			                   ],
 			                   ephemeral: true);
 			logger.ZLogError($"User {Context.User.GlobalName} could not be removed from the database.");
@@ -179,10 +178,10 @@ public sealed class UserManagementCommands(ILogger<UserManagementCommands> logge
 		await RespondAsync(embeds:
 		                   [
 			                   new EmbedBuilder()
-				                  .WithTitle("Deletion declined")
-				                  .WithDescription("Nice. Continue enjoying the bot.")
-				                  .WithColor(Color.Green)
-				                  .Build(),
+			                  .WithTitle("Deletion declined")
+			                  .WithDescription("Nice. Continue enjoying the bot.")
+			                  .WithColor(Color.Green)
+			                  .Build(),
 		                   ],
 		                   ephemeral: true);
 		logger.ZLogDebug($"User {Context.User.GlobalName} declined deletion.");
@@ -191,15 +190,14 @@ public sealed class UserManagementCommands(ILogger<UserManagementCommands> logge
 	[SlashCommand("get_hash", "Get the hash of the user.")]
 	public async Task GetHash()
 	{
-		var user = await db.Users.Include(u => u.Account)
-		                   .FirstOrDefaultAsync(u => u.UserId == Context.User.Id);
-		if (user == null)
+		var user = await api.GetUserAsync(Context.User.Id);
+		if (!user.Exists)
 		{
 			await RespondAsync("This user doesn't exist.", ephemeral: true);
 			return;
 		}
 
-		var hash = user.Account?.Hash;
+		var hash = user.Hash;
 		if (hash == null)
 		{
 			await RespondAsync("Something went wrong.", ephemeral: true);

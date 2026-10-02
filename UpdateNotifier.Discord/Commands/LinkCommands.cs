@@ -2,12 +2,13 @@
 using Discord.Interactions;
 using Discord.WebSocket;
 using Microsoft.Extensions.Logging;
+using UpdateNotifier.Communication;
 using UpdateNotifier.Services;
 using ZLogger;
 
 namespace UpdateNotifier.Commands;
 
-public sealed class LinkCommands(ILogger<LinkCommands> logger, IWebAuthService webAuthService)
+public sealed class LinkCommands(ILogger<LinkCommands> logger, UpdateNotifierApiClient api)
 	: InteractionModuleBase<SocketInteractionContext>
 {
 	[SlashCommand("link", "Link your Discord account to your UpdateNotifier website account")]
@@ -15,10 +16,10 @@ public sealed class LinkCommands(ILogger<LinkCommands> logger, IWebAuthService w
 	{
 		logger.ZLogDebug($"User {Context.User.Id} is trying to link their Discord account to a website account.");
 
-		LinkOutcome outcome;
+		LinkConsumeResponse outcome;
 		try
 		{
-			outcome = await webAuthService.ConsumeLinkCodeAsync(code, Context.User.Id, Context.User.GlobalName ?? Context.User.Username);
+			outcome = await api.ConsumeLinkCodeAsync(code, Context.User.Id, Context.User.GlobalName ?? Context.User.Username);
 		}
 		catch (Exception e)
 		{
@@ -47,7 +48,8 @@ public sealed class LinkCommands(ILogger<LinkCommands> logger, IWebAuthService w
 		                         .Build(),
 		                   ephemeral: true);
 
-		if (outcome.IsSuccess)
+		// same success kinds as LinkOutcome.IsSuccess: Linked, Merged or AlreadyLinked
+		if (outcome.Kind is LinkOutcomeKind.Linked or LinkOutcomeKind.Merged or LinkOutcomeKind.AlreadyLinked)
 			logger.ZLogInformation($"User {Context.User.GlobalName} linked their Discord account to a website account ({outcome.Kind}).");
 	}
 }

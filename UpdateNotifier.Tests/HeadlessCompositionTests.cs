@@ -7,24 +7,41 @@ using UpdateNotifier.Utilities;
 namespace UpdateNotifier.Tests;
 
 /// <summary>
-///     Mirrors the host's headless branch: the core wires up on its own, Discord is replaced by no-ops.
-///     Only references UpdateNotifier.Core - proving the core is testable without Discord.Net.
+///     The API container always composes the core now: DMs are enqueued durably as
+///     <see cref="QueuedDmSender" /> rows for the bot container to poll, and privilege checks read
+///     the bot-synced cache through <see cref="SyncedPrivilegeChecker" />. Only references
+///     UpdateNotifier.Core - proving the core is testable without Discord.Net - and last-wins
+///     registrations still replace the defaults for embedders that bring their own pieces.
 /// </summary>
 [Collection(DatabaseFixture.CollectionName)]
 public sealed class HeadlessCompositionTests
 {
-	[Fact]
-	public void HeadlessRegistrations_ResolveNoopSenderAndInlinePrivileges()
-	{
-		var services = new ServiceCollection();
-		services.AddLogging();
-		services.AddUpdateNotifierCore();
-		services.AddSingleton<IDmSender, NoopDmSender>();
-		services.AddSingleton<IPrivilegeChecker>(provider => new InlinePrivilegeChecker(provider.GetRequiredService<Config>().SelfHosted));
+    [Fact]
+    public void CoreRegistrations_ResolveQueuedSenderAndSyncedPrivileges()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddUpdateNotifierCore();
 
-		using var provider = services.BuildServiceProvider();
+        using var provider = services.BuildServiceProvider();
 
-		Assert.IsType<NoopDmSender>(provider.GetRequiredService<IDmSender>());
-		Assert.IsType<InlinePrivilegeChecker>(provider.GetRequiredService<IPrivilegeChecker>());
-	}
+        Assert.IsType<QueuedDmSender>(provider.GetRequiredService<IDmSender>());
+        Assert.IsType<SyncedPrivilegeChecker>(provider.GetRequiredService<IPrivilegeChecker>());
+    }
+
+    [Fact]
+    public void LastWinsRegistration_ReplacesQueuedSenderAndSyncedChecker()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddUpdateNotifierCore();
+        // an embedder overriding after AddUpdateNotifierCore must still win (last registration takes it)
+        services.AddSingleton<IDmSender, NoopDmSender>();
+        services.AddSingleton<IPrivilegeChecker>(provider => new InlinePrivilegeChecker(provider.GetRequiredService<Config>().SelfHosted));
+
+        using var provider = services.BuildServiceProvider();
+
+        Assert.IsType<NoopDmSender>(provider.GetRequiredService<IDmSender>());
+        Assert.IsType<InlinePrivilegeChecker>(provider.GetRequiredService<IPrivilegeChecker>());
+    }
 }

@@ -1,11 +1,9 @@
-﻿using System.Collections.Immutable;
-using Discord;
+﻿using Discord;
 using Discord.Commands;
 using Discord.Interactions;
 using Discord.WebSocket;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using UpdateNotifier.Data;
+using UpdateNotifier.Services;
 using UpdateNotifier.Utilities;
 using DiscordPrivilegeChecker = UpdateNotifier.Bot.DiscordPrivilegeChecker;
 using ZLogger;
@@ -14,7 +12,7 @@ using ZLogger;
 
 namespace UpdateNotifier.Commands;
 
-public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db, IHttpClientFactory httpClientFactory, DiscordPrivilegeChecker privilegeChecker)
+public class WatchlistCommands(ILogger<WatchlistCommands> logger, UpdateNotifierApiClient api, IHttpClientFactory httpClientFactory, DiscordPrivilegeChecker privilegeChecker)
 	: InteractionModuleBase<SocketInteractionContext>
 {
 	[SlashCommand("watch", "Watch a thread and get updates from it."), Alias("add")]
@@ -30,16 +28,12 @@ public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db
 
 		try
 		{
-			var account = db.Users.Include(u => u.Account)
-			                .FirstOrDefault(u => u.UserId == user.Id)?.Account;
-			if (account == null)
-			{
-				await RespondAsync("Use /enable first.", ephemeral: true);
-				return;
-			}
-
-			var (_, response) = await db.TrackGames(account.Hash, urls, privilegeChecker.IsPrivileged(user));
+			var (_, response) = await api.WatchAsync(user.Id, urls, privilegeChecker.IsPrivileged(user));
 			await RespondAsync(response, ephemeral: true);
+		}
+		catch (UserNotFoundException e)
+		{
+			await RespondAsync(e.Message, ephemeral: true);
 		}
 		catch (Exception e)
 		{
@@ -71,16 +65,12 @@ public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db
 			var urlsCombined = await client.GetStringAsync(attachment.Url);
 			var urls = urlsCombined.Split('\n');
 
-			var account = db.Users.Include(u => u.Account)
-			                .FirstOrDefault(u => u.UserId == user.Id)?.Account;
-			if (account == null)
-			{
-				await RespondAsync("Use /enable first.", ephemeral: true);
-				return;
-			}
-
-			var (_, response) = await db.TrackGames(account.Hash, urls, privilegeChecker.IsPrivileged(user));
+			var (_, response) = await api.WatchAsync(user.Id, urls, privilegeChecker.IsPrivileged(user));
 			await RespondAsync(response, ephemeral: true);
+		}
+		catch (UserNotFoundException e)
+		{
+			await RespondAsync(e.Message, ephemeral: true);
 		}
 		catch (Exception e)
 		{
@@ -94,18 +84,22 @@ public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db
 	{
 		var urls = urlsCombined.Split(' ');
 		var user = Context.User;
-		var account = db.Users.Include(u => u.Account)
-		                .FirstOrDefault(u => u.UserId == user.Id)?.Account;
-		if (account == null)
+		try
+		{
+			var privileged = user is SocketGuildUser guildUser && privilegeChecker.IsPrivileged(guildUser);
+			var (_, response) = await api.UnwatchAsync(user.Id, urls, privileged);
+			await RespondAsync(response, ephemeral: true);
+		}
+		catch (UserNotFoundException e)
 		{
 			logger.ZLogError($"User {user.Id} does not exist, aborting removing from watchlist.");
-			await RespondAsync("User not found. Use /enable first.", ephemeral: true);
-			return;
+			await RespondAsync(e.Message, ephemeral: true);
 		}
-
-		var privileged = user is SocketGuildUser guildUser && privilegeChecker.IsPrivileged(guildUser);
-		var (_, response) = await db.UntrackGames(account.Hash, urls, privileged);
-		await RespondAsync(response, ephemeral: true);
+		catch (Exception e)
+		{
+			logger.ZLogError(e, $"[{e.GetType()}]Failed to remove games {urlsCombined}");
+			await RespondAsync($"Something went wrong trying to remove:\n{urlsCombined}", ephemeral: true);
+		}
 	}
 
 	[SlashCommand("list", "Returns the watchlist. Sends a file if you're watching tons of threads.")]
@@ -121,31 +115,36 @@ public class WatchlistCommands(ILogger<WatchlistCommands> logger, DataContext db
 
 		var user = Context.User;
 
-		if (!await db.Users.AnyAsync(u => u.UserId == user.Id && u.Account != null))
+		try
+		{
+			var games = await api.GetWatchlistAsync(user.Id);
+
+			if (games.Count > 0)
+			{
+				var gameInfos = (includeTitle, includeUrl) switch
+				{
+					(true, true)  => games.Select(g => $"{g.Title} - {g.Url}"),
+					(false, true) => games.Select(g => g.Url),
+					_             => games.Select(g => g.Title),
+				};
+				var allGames = string.Join("\n", gameInfos);
+				if (allGames.Length > 2000) await RespondWithFileAsync(allGames.StringToStream(), "Watchlist.txt", "Too many games to list in a message.", ephemeral: true);
+				else await RespondAsync(allGames, ephemeral: true);
+			}
+			else
+			{
+				await RespondAsync("Empty watchlist :(", ephemeral: true);
+			}
+		}
+		catch (UserNotFoundException e)
 		{
 			logger.ZLogError($"User {user.Id} does not exist, aborting listing.");
-			await RespondAsync("User not found. Use /enable first.", ephemeral: true);
-			return;
+			await RespondAsync(e.Message, ephemeral: true);
 		}
-
-		var games = await db.Users.Where(u => u.UserId == user.Id).Select(u => u.Account!.Games).FirstAsync().ConfigureAwait(false);
-
-		var orderedGames = games.OrderByDescending(game => game).ToImmutableList();
-		if (!orderedGames.IsEmpty)
+		catch (Exception e)
 		{
-			var gameInfos = (includeTitle, includeUrl) switch
-			{
-				(true, true)  => orderedGames.Select(g => $"{g.Title} - {g.Url}"),
-				(false, true) => orderedGames.Select(g => g.Url),
-				_             => orderedGames.Select(g => g.ToString()),
-			};
-			var allGames = string.Join("\n", gameInfos);
-			if (allGames.Length > 2000) await RespondWithFileAsync(allGames.StringToStream(), "Watchlist.txt", "Too many games to list in a message.", ephemeral: true);
-			else await RespondAsync(allGames, ephemeral: true);
-		}
-		else
-		{
-			await RespondAsync("Empty watchlist :(", ephemeral: true);
+			logger.ZLogError(e, $"[{e.GetType()}]Failed to list watchlist for {user.Id}");
+			await RespondAsync("Something went wrong while getting your watchlist.", ephemeral: true);
 		}
 	}
 }

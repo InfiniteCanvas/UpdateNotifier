@@ -1,20 +1,81 @@
 ﻿services:
-  update-notifier:
-    image: update-notifier
+  api:
+    image: update-notifier-api
     build:
       context: .
       dockerfile: UpdateNotifier/Dockerfile
+    restart: unless-stopped
     environment:
-      - DISCORD_BOT_TOKEN=${TOKEN}
-      - DISABLE_DISCORD=${DISABLE_DISCORD:-false}
-      - DISCORD_GUILD_ID=${GUILD_ID}
       - DATABASE_PATH=/data/app.db
       - LOGS_FOLDER=/data/logs
-      - SELF_HOSTED=false # enables supporter features
-      - RSS_UPDATE_INTERVAL=5 # in minutes
+      - SELF_HOSTED=${SELF_HOSTED:-false} # enables supporter features
+      - RSS_UPDATE_INTERVAL=${RSS_UPDATE_INTERVAL:-5} # in minutes
+      - RSS_FEED_URLS=${RSS_FEED_URLS:-}
       - XF_USER=${XF_USER}
       - XF_SESSION=${XF_SESSION}
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:?set INTERNAL_API_KEY in .env (openssl rand -hex 32)}
+      - INTERNAL_API_ALLOWED_CIDRS=${INTERNAL_API_ALLOWED_CIDRS:-}
     volumes:
       - ./data:/data
-    ports:
-      - "8080:8080" # companion website + API; put behind a TLS reverse proxy for login cookies
+    networks:
+      - default
+      - traefik
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${TRAEFIK_NETWORK:-traefik}
+      - traefik.http.routers.updatenotifier-api.rule=Host(`${DOMAIN:?set DOMAIN in .env}`) && (PathPrefix(`/api`) || PathPrefix(`/openapi`) || PathPrefix(`/scalar`)) && !PathPrefix(`/api/internal`)
+      - traefik.http.routers.updatenotifier-api.priority=100
+      - traefik.http.routers.updatenotifier-api.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}
+      - traefik.http.services.updatenotifier-api.loadbalancer.server.port=8080
+      # enable if your entrypoint uses a cert resolver:
+      # - traefik.http.routers.updatenotifier-api.tls.certresolver=${TRAEFIK_CERTRESOLVER}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  bot:
+    image: update-notifier-bot
+    build:
+      context: .
+      dockerfile: UpdateNotifier.Discord/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      - DISCORD_BOT_TOKEN=${TOKEN}
+      - DISCORD_GUILD_ID=${GUILD_ID:?set GUILD_ID in .env}
+      - PRIVILEGED_ROLE_IDS=${PRIVILEGED_ROLE_IDS:-}
+      - ENVIRONMENT=production
+      - SELF_HOSTED=${SELF_HOSTED:-false}
+      - API_BASE_URL=http://api:8080
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:?set INTERNAL_API_KEY in .env (openssl rand -hex 32)}
+    networks:
+      - default
+
+  web:
+    image: update-notifier-web
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    networks:
+      - default
+      - traefik
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${TRAEFIK_NETWORK:-traefik}
+      - traefik.http.routers.updatenotifier-web.rule=Host(`${DOMAIN:?set DOMAIN in .env}`)
+      - traefik.http.routers.updatenotifier-web.priority=1
+      - traefik.http.routers.updatenotifier-web.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}
+      - traefik.http.services.updatenotifier-web.loadbalancer.server.port=8080
+      # - traefik.http.routers.updatenotifier-web.tls.certresolver=${TRAEFIK_CERTRESOLVER}
+
+networks:
+  traefik:
+    external: true

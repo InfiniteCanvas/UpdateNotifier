@@ -37,7 +37,6 @@
 
     <ItemGroup>
         <ProjectReference Include="..\UpdateNotifier.Core\UpdateNotifier.Core.csproj"/>
-        <ProjectReference Include="..\UpdateNotifier.Discord\UpdateNotifier.Discord.csproj"/>
     </ItemGroup>
 
 </Project>

@@ -28,6 +28,8 @@ public sealed class DataContext(ILogger<DataContext> logger, Config config, Game
 	public DbSet<WebAccount>     WebAccounts => Set<WebAccount>();
 	public DbSet<WebSession>     WebSessions => Set<WebSession>();
 	public DbSet<LinkCode>       LinkCodes   => Set<LinkCode>();
+	public DbSet<PendingNotification> PendingNotifications => Set<PendingNotification>();
+	public DbSet<PrivilegedUser>      PrivilegedUsers      => Set<PrivilegedUser>();
 
 	protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 		=> optionsBuilder.UseSqlite($"Data Source={config.DatabasePath}").AddInterceptors(new HashInterceptor());
@@ -83,6 +85,8 @@ public sealed class DataContext(ILogger<DataContext> logger, Config config, Game
 		            .HasForeignKey(l => l.AccountId)
 		            .IsRequired()
 		            .OnDelete(DeleteBehavior.Cascade);
+		modelBuilder.Entity<PendingNotification>()
+		            .HasIndex(p => new { p.Status, p.Id });
 	}
 
 	public bool UserExists(ulong userId) => Users.Any(u => u.UserId == userId);

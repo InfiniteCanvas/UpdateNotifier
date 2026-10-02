@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using UpdateNotifier.Abstractions;
 using UpdateNotifier.Data;
 using UpdateNotifier.Services;
 using UpdateNotifier.Utilities;
@@ -15,7 +16,9 @@ public static class ServiceCollectionExtensions
 {
 	/// <summary>
 	///     Registers the platform-independent core: configuration, database, RSS monitor and the notification pipeline.
-	///     Discord is wired separately (or replaced by no-ops) by the host.
+	///     Discord runs in its own container: DMs are enqueued durably for the bot to poll
+	///     (<see cref="UpdateNotifier.Abstractions.QueuedDmSender" />) and privilege checks read the
+	///     bot-synced cache (<see cref="UpdateNotifier.Abstractions.SyncedPrivilegeChecker" />).
 	/// </summary>
 	public static IServiceCollection AddUpdateNotifierCore(this IServiceCollection services)
 	{
@@ -47,6 +50,8 @@ public static class ServiceCollectionExtensions
 		               .AddHostedService(provider => provider.GetRequiredService<RssMonitorService>())
 		               .AddTransient<IEndpointHandlerService, EndpointHandlerService>()
 		               .AddTransient<IWebAuthService, WebAuthService>()
+		               .AddSingleton<IDmSender, QueuedDmSender>()
+		               .AddSingleton<IPrivilegeChecker, SyncedPrivilegeChecker>()
 		               .AddHttpClient("RssFeed",
 		                              (provider, client) =>
 		                              {
