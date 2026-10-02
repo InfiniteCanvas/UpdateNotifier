@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using UpdateNotifier.Abstractions;
 using UpdateNotifier.Data;
 using UpdateNotifier.Data.Models;
 using UpdateNotifier.Data.Requests;
@@ -105,11 +106,18 @@ public static class WebEndpointExtensions
 		    .WithDescription("Removes the account, its watchlist and every linked row; requires the password");
 
 		endpoints.MapGet("/api/v1/auth/me",
-		        async (HttpContext http, IWebAuthService auth, CancellationToken ct) =>
+		        async (HttpContext http, IWebAuthService auth, IPrivilegeChecker privileges, Config config, CancellationToken ct) =>
 		        {
 			        var account = await GetAccountFromCookieAsync(http, auth, ct);
 			        if (account is not { Account: { } target })
 				        return NotSignedIn();
+
+			        // mirrors the limit enforcement in DataContext.TrackGames: self-hosted or
+			        // bot-synced privilege lifts the cap. Enforcement rejects adds once
+			        // count + incoming >= FREE_USER_LIMIT, so the largest watchlist a free
+			        // account can actually reach is FREE_USER_LIMIT - 1 — report that.
+			        var privileged = config.SelfHosted
+			                         || (target.User is { } user && await privileges.IsPrivilegedAsync(user.UserId, ct));
 
 			        return Results.Ok(new
 			        {
@@ -117,13 +125,14 @@ public static class WebEndpointExtensions
 				        Username = account.Username,
 				        target.Hash,
 				        DiscordLinked = target.User != null,
-				        DiscordUsername = target.User?.DiscordUsername
+				        DiscordUsername = target.User?.DiscordUsername,
+				        GameLimit = privileged ? (int?) null : Config.FREE_USER_LIMIT - 1
 			        });
 		        })
-		    .WithName("GetMe")
-		    .WithTags("Auth")
-		    .WithSummary("Get the signed-in account")
-		    .WithDescription("Returns account id, username, extension hash and Discord link status");
+	        .WithName("GetMe")
+	        .WithTags("Auth")
+	        .WithSummary("Get the signed-in account")
+	        .WithDescription("Returns account id, username, extension hash, Discord link status and the account's game limit (null = unlimited)");
 	}
 
 	private static void MapMeEndpoints(IEndpointRouteBuilder endpoints)

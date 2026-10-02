@@ -7,6 +7,7 @@ export interface Me {
 	hash: string;
 	discordLinked: boolean;
 	discordUsername: string | null;
+	gameLimit: number | null; // null = unlimited
 }
 
 export interface GameEntry {

@@ -53,6 +53,13 @@
 </svelte:head>
 
 <section class="card auth-card">
+	<div class="auth-brand" aria-hidden="true">
+		<svg width="28" height="28" viewBox="0 0 32 32">
+			<rect width="32" height="32" rx="7" fill="#141925" />
+			<circle cx="16" cy="16" r="6.5" fill="none" stroke="#ffad5c" stroke-width="2" opacity="0.5" />
+			<circle cx="16" cy="16" r="3" fill="#ffad5c" />
+		</svg>
+	</div>
 	<h1>Create an account</h1>
 	<form onsubmit={submit} novalidate>
 		<div class="field">
