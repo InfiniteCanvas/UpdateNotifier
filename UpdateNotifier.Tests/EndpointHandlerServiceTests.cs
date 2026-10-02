@@ -17,7 +17,8 @@ public sealed class EndpointHandlerServiceTests(DatabaseFixture fixture)
 		=> new(db,
 		       Microsoft.Extensions.Logging.Abstractions.NullLogger<EndpointHandlerService>.Instance,
 		       privileges,
-		       sender);
+		       sender,
+		       new ThumbnailQueue());
 
 	/// <summary>Creates the account + linked user the way production does, and returns the account's hash and id.</summary>
 	private static async Task<(string Hash, ulong AccountId)> SeedUserAsync(DatabaseFixture fixture, ulong userId)

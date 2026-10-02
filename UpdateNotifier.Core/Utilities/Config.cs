@@ -34,6 +34,18 @@ public sealed class Config
 		else
 			UpdateCheckInterval = TimeSpan.FromMinutes(5);
 
+		var scrapeRateStr = Environment.GetEnvironmentVariable("THUMBNAIL_SCRAPE_RATE");
+		if (!string.IsNullOrEmpty(scrapeRateStr) && int.TryParse(scrapeRateStr, out var scrapeRate) && scrapeRate > 0)
+			ThumbnailScrapeRatePerMinute = scrapeRate;
+		else
+			ThumbnailScrapeRatePerMinute = 30;
+
+		var sweepStr = Environment.GetEnvironmentVariable("THUMBNAIL_SWEEP_INTERVAL_MINUTES");
+		if (!string.IsNullOrEmpty(sweepStr) && int.TryParse(sweepStr, out var sweepMinutes) && sweepMinutes > 0)
+			ThumbnailSweepInterval = TimeSpan.FromMinutes(sweepMinutes);
+		else
+			ThumbnailSweepInterval = TimeSpan.FromMinutes(360);
+
 		InternalApiKey = Environment.GetEnvironmentVariable("INTERNAL_API_KEY") ?? string.Empty;
 		if (string.IsNullOrEmpty(InternalApiKey))
 			logger.ZLogWarning($"INTERNAL_API_KEY is not set - the internal API endpoints will reject every caller");
@@ -80,6 +92,9 @@ public sealed class Config
 	public string   XfUser              { get; }
 	public string   XfSession           { get; }
 
+	public int      ThumbnailScrapeRatePerMinute { get; }
+	public TimeSpan ThumbnailSweepInterval       { get; }
+
 	public string                   InternalApiKey          { get; }
 	public IReadOnlyList<IPNetwork> InternalApiAllowedCidrs { get; }
 
@@ -93,5 +108,6 @@ public sealed class Config
 			: DefaultFreeUserLimit;
 
 	public override string ToString()
-		=> $"{nameof(DatabasePath)}: {DatabasePath}, {nameof(LogsFolderPath)}: {LogsFolderPath}, {nameof(UpdateCheckInterval)}: {UpdateCheckInterval}, {nameof(RssFeedUrls)}: {RssFeedUrls}";
+		=> $"{nameof(DatabasePath)}: {DatabasePath}, {nameof(LogsFolderPath)}: {LogsFolderPath}, {nameof(UpdateCheckInterval)}: {UpdateCheckInterval}, {nameof(RssFeedUrls)}: {RssFeedUrls}, "
+		   + $"{nameof(ThumbnailScrapeRatePerMinute)}: {ThumbnailScrapeRatePerMinute}, {nameof(ThumbnailSweepInterval)}: {ThumbnailSweepInterval}";
 }

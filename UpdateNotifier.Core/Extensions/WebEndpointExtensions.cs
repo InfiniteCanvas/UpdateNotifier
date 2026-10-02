@@ -153,13 +153,15 @@ public static class WebEndpointExtensions
 		    .WithDescription("Replaces the watchlist hash used by the extension; the old one stops working immediately");
 
 		endpoints.MapGet("/api/v1/me/games",
-		        async (HttpContext http, DataContext db, IWebAuthService auth, CancellationToken ct) =>
+		        async (HttpContext http, DataContext db, IWebAuthService auth, ThumbnailQueue scrapeQueue, CancellationToken ct) =>
 		        {
 			        var account = await GetAccountFromCookieAsync(http, auth, ct);
 			        if (account is not { Account: { } target })
 				        return NotSignedIn();
 
 			        var games = await GetWatchedGamesAsync(db, target.AccountId, ct);
+			        // someone is looking at their watchlist right now: jump anything still imageless to the front of the scrape queue
+			        scrapeQueue.EnqueueWatched(games.Where(g => g.ThumbnailUrl is null).Select(g => (g.GameId, g.LastUpdated)));
 			        return Results.Ok(games);
 		        })
 		    .WithName("GetMyGames")

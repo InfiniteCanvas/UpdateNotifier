@@ -18,7 +18,7 @@ public interface IEndpointHandlerService
 	public ValueTask<IResult> GetWatchedGamesAsync(string userHash, CancellationToken ct = default);
 }
 
-public class EndpointHandlerService(DataContext db, ILogger<EndpointHandlerService> logger, IPrivilegeChecker privilegeChecker, IDmSender dmSender)
+public class EndpointHandlerService(DataContext db, ILogger<EndpointHandlerService> logger, IPrivilegeChecker privilegeChecker, IDmSender dmSender, ThumbnailQueue scrapeQueue)
 	: IEndpointHandlerService
 {
 	public async ValueTask<IResult> AddGameAsync(GameAddRequest request, CancellationToken ct = default)
@@ -71,7 +71,12 @@ public class EndpointHandlerService(DataContext db, ILogger<EndpointHandlerServi
 		logger.ZLogDebug($"Retrieving watched games for {userHash.RedactHash()}");
 		var account = await db.Accounts.Include(a => a.Games)
 		                      .FirstOrDefaultAsync(a => a.Hash == userHash.Trim().ToUpperInvariant(), ct);
-		if (account != null) return Results.Ok(account.Games.Select(g => g.GameId));
+		if (account != null)
+		{
+			// a watchlist view is the strongest signal a thumbnail is wanted: jump the imageless games ahead of housekeeping
+			scrapeQueue.EnqueueWatched(account.Games.Where(g => g.ThumbnailUrl is null).Select(g => (g.GameId, g.LastUpdated)));
+			return Results.Ok(account.Games.Select(g => g.GameId));
+		}
 
 		logger.ZLogError($"User {userHash.RedactHash()} was not found");
 		return Results.NotFound("User was not found");

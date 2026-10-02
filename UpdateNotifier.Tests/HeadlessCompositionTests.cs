@@ -1,7 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using UpdateNotifier.Abstractions;
 using UpdateNotifier.Extensions;
+using UpdateNotifier.Services;
 using UpdateNotifier.Utilities;
 
 namespace UpdateNotifier.Tests;
@@ -27,6 +29,26 @@ public sealed class HeadlessCompositionTests
 
         Assert.IsType<QueuedDmSender>(provider.GetRequiredService<IDmSender>());
         Assert.IsType<SyncedPrivilegeChecker>(provider.GetRequiredService<IPrivilegeChecker>());
+    }
+
+    [Fact]
+    public void CoreRegistrations_ResolveThumbnailServicesAsSingletons()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddUpdateNotifierCore();
+
+        using var provider = services.BuildServiceProvider();
+
+        var queue = provider.GetRequiredService<ThumbnailQueue>();
+        var scraper = provider.GetRequiredService<ThumbnailScraperService>();
+
+        Assert.IsType<ThumbnailQueue>(queue);
+        Assert.IsType<ThumbnailScraperService>(scraper);
+        Assert.Same(queue, provider.GetRequiredService<ThumbnailQueue>());
+        Assert.Same(scraper, provider.GetRequiredService<ThumbnailScraperService>());
+        // the hosted registration hands out the same singleton, not a second instance
+        Assert.Contains(scraper, provider.GetServices<IHostedService>());
     }
 
     [Fact]

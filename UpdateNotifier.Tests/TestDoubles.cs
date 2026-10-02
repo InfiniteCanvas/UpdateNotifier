@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 using System.Xml;
 using System.ServiceModel.Syndication;
@@ -16,6 +17,43 @@ public sealed class ThrowingHttpClientFactory : IHttpClientFactory
 
 	public HttpClient CreateClient(string name)
 		=> throw new InvalidOperationException("No HTTP traffic is expected in these tests.");
+}
+
+/// <summary>
+///     Serves canned HTML instead of reaching the network: every requested URL is recorded so
+///     tests can assert what was (or was not) fetched, and the responder decides the body.
+/// </summary>
+public sealed class StubHttpMessageHandler(Func<HttpRequestMessage, string> responder) : HttpMessageHandler
+{
+	public List<string> RequestedUrls { get; } = [];
+
+	protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+	{
+		RequestedUrls.Add(request.RequestUri?.ToString() ?? string.Empty);
+		return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+		{
+			Content = new StringContent(responder(request), Encoding.UTF8, "text/html")
+		});
+	}
+}
+
+public sealed class StubHttpClientFactory(StubHttpMessageHandler handler) : IHttpClientFactory
+{
+	public HttpClient CreateClient(string name)
+		=> name == "F95Thread"
+			? new HttpClient(handler) { BaseAddress = new Uri("https://f95zone.to/") }
+			: throw new InvalidOperationException("No HTTP traffic is expected in these tests.");
+}
+
+/// <summary>
+///     A clock that only moves when the test moves it - deterministic refill math for rate limiters.
+/// </summary>
+public sealed class MutableTimeProvider : TimeProvider
+{
+	public DateTimeOffset NowValue { get; set; } = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+
+	public override DateTimeOffset GetUtcNow()
+		=> NowValue;
 }
 
 public sealed class FakeDmSender : IDmSender

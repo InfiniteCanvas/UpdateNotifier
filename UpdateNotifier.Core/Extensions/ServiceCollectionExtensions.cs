@@ -48,6 +48,9 @@ public static class ServiceCollectionExtensions
 		               .AddHostedService(provider => provider.GetRequiredService<NotificationService>())
 		               .AddSingleton<RssMonitorService>()
 		               .AddHostedService(provider => provider.GetRequiredService<RssMonitorService>())
+		               .AddSingleton<ThumbnailQueue>()
+		               .AddSingleton<ThumbnailScraperService>()
+		               .AddHostedService(provider => provider.GetRequiredService<ThumbnailScraperService>())
 		               .AddTransient<IEndpointHandlerService, EndpointHandlerService>()
 		               .AddTransient<IWebAuthService, WebAuthService>()
 		               .AddSingleton<IDmSender, QueuedDmSender>()
@@ -57,6 +60,24 @@ public static class ServiceCollectionExtensions
 		                              {
 			                              _ = provider.GetRequiredService<Config>();
 			                              client.BaseAddress = new Uri(Config.RSS_FEED_BASE);
+		                              })
+		               .ConfigurePrimaryHttpMessageHandler(provider =>
+		                                                   {
+		                                                   var config = provider.GetRequiredService<Config>();
+		                                                   var handler = new HttpClientHandler { UseCookies = true, CookieContainer = new CookieContainer() };
+		                                                   handler.CookieContainer.Add(new Uri(Config.RSS_FEED_BASE), new Cookie("xf_user",    config.XfUser));
+		                                                   handler.CookieContainer.Add(new Uri(Config.RSS_FEED_BASE), new Cookie("xf_session", config.XfSession));
+		                                                   return handler;
+		                                                   })
+		               .Services
+		               .AddHttpClient("F95Thread",
+		                              (provider, client) =>
+		                              {
+			                              _ = provider.GetRequiredService<Config>();
+			                              client.BaseAddress = new Uri(Config.RSS_FEED_BASE);
+			                              // thread pages are scraped politely and in volume: identify as a browser
+			                              client.DefaultRequestHeaders.UserAgent.ParseAdd(
+				                              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36");
 		                              })
 		               .ConfigurePrimaryHttpMessageHandler(provider =>
 		                                                   {

@@ -89,6 +89,9 @@ public sealed class WebMeEndpointTests(DatabaseFixture db, WebApiFixture api) : 
 	// this class's own disjoint Discord snowflake range so tests can share one database
 	private const ulong UserIdBase = 5_300_000_000;
 
+	// ...and its own disjoint game id range
+	private const ulong GameIdBase = 5_400_000_000;
+
 	private const string Password = "password123";
 
 	private async Task<AuthResult> RegisterAsync(string username)
@@ -104,6 +107,27 @@ public sealed class WebMeEndpointTests(DatabaseFixture db, WebApiFixture api) : 
 		await using var ctx = db.CreateContext();
 		ctx.Users.Add(new User(userId) { AccountId = accountId, DiscordUsername = username });
 		await ctx.SaveChangesAsync();
+	}
+
+	private static async Task SeedWatchlistGameAsync(DatabaseFixture db, ulong accountId, ulong gameId, string? thumbnailUrl)
+	{
+		await using var ctx = db.CreateContext();
+		ctx.Games.Add(new Game(gameId, $"Game {gameId}",
+		                       new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+		                       $"https://f95zone.to/threads/{gameId}",
+		                       thumbnailUrl));
+		ctx.Watchlist.Add(new WatchlistEntry { AccountId = accountId, GameId = gameId });
+		await ctx.SaveChangesAsync();
+	}
+
+	/// <summary>GETs /me/games with the session cookie, exactly the shape the browser sends.</summary>
+	private async Task<JsonNode?> GetMyGamesAsync(AuthResult register)
+	{
+		using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/me/games");
+		request.Headers.Add("Cookie", $"{WebEndpointExtensions.SessionCookieName}={register.Token}");
+		using var response = await api.Client.SendAsync(request);
+		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+		return JsonNode.Parse(await response.Content.ReadAsStringAsync());
 	}
 
 	private static async Task<JsonNode?> GetMeAsync(HttpClient client, string? token)
@@ -205,5 +229,30 @@ public sealed class WebMeEndpointTests(DatabaseFixture db, WebApiFixture api) : 
 		Assert.False(body!["discordLinked"]!.GetValue<bool>()); // privileged by deployment, not by link
 		Assert.True(((JsonObject)body).ContainsKey("gameLimit"));
 		Assert.Null(body["gameLimit"]);
+	}
+
+	[Fact]
+	public async Task MyGames_ThumbnaillessWatchedGame_IsEnqueuedForScraping()
+	{
+		const ulong gameId = GameIdBase + 1;
+		var register = await RegisterAsync("me-games-thumbless");
+		await SeedWatchlistGameAsync(db, register.AccountId, gameId, null);
+
+		await GetMyGamesAsync(register);
+
+		// the watchlist view must have jumped the imageless game into the app's real scrape queue
+		Assert.True(api.App.Services.GetRequiredService<ThumbnailQueue>().Contains(gameId));
+	}
+
+	[Fact]
+	public async Task MyGames_GameWithThumbnail_IsNotEnqueued()
+	{
+		const ulong gameId = GameIdBase + 2;
+		var register = await RegisterAsync("me-games-thumb");
+		await SeedWatchlistGameAsync(db, register.AccountId, gameId, "https://example.com/banners/has-one.png");
+
+		await GetMyGamesAsync(register);
+
+		Assert.False(api.App.Services.GetRequiredService<ThumbnailQueue>().Contains(gameId));
 	}
 }
