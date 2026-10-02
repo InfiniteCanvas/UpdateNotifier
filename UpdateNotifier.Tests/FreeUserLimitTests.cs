@@ -10,6 +10,10 @@ public sealed class FreeUserLimitTests(DatabaseFixture fixture)
 	private const ulong GameIdBase = 4_000_000_000;
 	private const ulong UserIdBase = 4_100_000_000;
 
+	// per-test gameId stride; must exceed the seeded at-limit range (FREE_USER_LIMIT - 1 games)
+	// with room to spare for the unseeded probe game, or tests collide on Games.GameId
+	private static readonly ulong GameIdStride = (ulong) Config.FREE_USER_LIMIT * 10;
+
 	private static async Task<(string Hash, ulong AccountId)> SeedUserAtLimitAsync(DatabaseFixture fixture, ulong userId, ulong gameIdBase)
 	{
 		await using var db = fixture.CreateContext();
@@ -52,8 +56,8 @@ public sealed class FreeUserLimitTests(DatabaseFixture fixture)
 	public async Task PrivilegedUser_AtLimit_BypassesLimit()
 	{
 		const ulong userId = UserIdBase + 101;
-		const ulong gameIdBase = GameIdBase + 10_000;
-		const ulong newGameId = gameIdBase + 500;
+		var gameIdBase = GameIdBase + GameIdStride;
+		var newGameId = gameIdBase + GameIdStride / 2;
 		var (hash, accountId) = await SeedUserAtLimitAsync(fixture, userId, gameIdBase);
 		// Pre-seed the target game so TrackGames never tries to scrape its thread page.
 		await using (var seed = fixture.CreateContext())
@@ -74,7 +78,7 @@ public sealed class FreeUserLimitTests(DatabaseFixture fixture)
 	public async Task TrackGames_UnknownHash_FailsWithoutTouchingTheDatabase()
 	{
 		const ulong userId = UserIdBase + 201;
-		const ulong gameIdBase = GameIdBase + 20_000;
+		var gameIdBase = GameIdBase + 2 * GameIdStride;
 		var hash = await SeedUserAtLimitAsync(fixture, userId, gameIdBase);
 
 		await using var db = fixture.CreateContext();

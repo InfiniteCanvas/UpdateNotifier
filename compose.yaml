@@ -5,8 +5,8 @@
     environment:
       - DATABASE_PATH=/data/app.db
       - LOGS_FOLDER=/data/logs
-      - SELF_HOSTED=${SELF_HOSTED:-false} # enables supporter features
-      - FREE_USER_LIMIT=${FREE_USER_LIMIT:-} # free watchlist cap; empty = built-in default (69)
+      - SELF_HOSTED=${SELF_HOSTED:-false} # removes the watchlist limit
+      - FREE_USER_LIMIT=${FREE_USER_LIMIT:-} # free watchlist cap; empty = built-in default (6969)
       - RSS_UPDATE_INTERVAL=${RSS_UPDATE_INTERVAL:-5} # in minutes
       - RSS_FEED_URLS=${RSS_FEED_URLS:-}
       - XF_USER=${XF_USER}

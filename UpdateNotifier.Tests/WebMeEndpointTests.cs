@@ -166,7 +166,7 @@ public sealed class WebMeEndpointTests(DatabaseFixture db, WebApiFixture api) : 
 		Assert.Matches("^[0-9A-F]{40}$", body["hash"]!.GetValue<string>());
 		Assert.False(body["discordLinked"]!.GetValue<bool>());
 		Assert.Null(body["discordUsername"]);
-		Assert.Equal(Config.FREE_USER_LIMIT - 1, body["gameLimit"]!.GetValue<int>()); // enforcement rejects at >= FREE_USER_LIMIT, so 68 is the reachable max
+		Assert.Equal(Config.FREE_USER_LIMIT - 1, body["gameLimit"]!.GetValue<int>()); // enforcement rejects at >= FREE_USER_LIMIT, so the reachable max is one below
 	}
 
 	[Fact]

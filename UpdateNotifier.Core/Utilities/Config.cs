@@ -98,7 +98,7 @@ public sealed class Config
 	public string                   InternalApiKey          { get; }
 	public IReadOnlyList<IPNetwork> InternalApiAllowedCidrs { get; }
 
-	private const int DefaultFreeUserLimit = 69;
+	private const int DefaultFreeUserLimit = 6969;
 
 	// static on purpose: enforcement sites (DataContext, web endpoints, tests) read it
 	// without holding a Config instance; FREE_USER_LIMIT env var overrides (must be > 0)
