@@ -1,9 +1,6 @@
 ﻿services:
   api:
-    image: update-notifier-api
-    build:
-      context: .
-      dockerfile: UpdateNotifier/Dockerfile
+    image: infinitecanvas/update-notifier-api:latest
     restart: unless-stopped
     environment:
       - DATABASE_PATH=/data/app.db
@@ -17,19 +14,19 @@
       - INTERNAL_API_KEY=${INTERNAL_API_KEY:?set INTERNAL_API_KEY in .env (openssl rand -hex 32)}
       - INTERNAL_API_ALLOWED_CIDRS=${INTERNAL_API_ALLOWED_CIDRS:-}
     volumes:
-      - ./data:/data
+      - ${DATA_DIR:-./data}:/data
+    user: "${API_UID:-1000}:${API_GID:-1000}" # keep matching the host dir owner so the app can write its db/logs
     networks:
-      - default
-      - traefik
+      - backend
+      - public
     labels:
       - traefik.enable=true
-      - traefik.docker.network=${TRAEFIK_NETWORK:-traefik}
+      - traefik.docker.network=public
       - traefik.http.routers.updatenotifier-api.rule=Host(`${DOMAIN:?set DOMAIN in .env}`) && (PathPrefix(`/api`) || PathPrefix(`/openapi`) || PathPrefix(`/scalar`)) && !PathPrefix(`/api/internal`)
       - traefik.http.routers.updatenotifier-api.priority=100
       - traefik.http.routers.updatenotifier-api.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}
+      - traefik.http.routers.updatenotifier-api.tls.certresolver=${TRAEFIK_CERTRESOLVER:-infinitecanvas-resolver}
       - traefik.http.services.updatenotifier-api.loadbalancer.server.port=8080
-      # enable if your entrypoint uses a cert resolver:
-      # - traefik.http.routers.updatenotifier-api.tls.certresolver=${TRAEFIK_CERTRESOLVER}
     healthcheck:
       # no curl/wget in the runtime image — probe /health over bash's /dev/tcp
       test: ["CMD", "bash", "-c", 'exec 3<>/dev/tcp/127.0.0.1/8080 && printf "GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n" >&3 && grep -q " 200 " <&3']
@@ -39,10 +36,7 @@
       start_period: 15s
 
   bot:
-    image: update-notifier-bot
-    build:
-      context: .
-      dockerfile: UpdateNotifier.Discord/Dockerfile
+    image: infinitecanvas/update-notifier-bot:latest
     restart: unless-stopped
     depends_on:
       api:
@@ -56,28 +50,26 @@
       - API_BASE_URL=http://api:8080
       - INTERNAL_API_KEY=${INTERNAL_API_KEY:?set INTERNAL_API_KEY in .env (openssl rand -hex 32)}
     networks:
-      - default
+      - backend
 
   web:
-    image: update-notifier-web
-    build:
-      context: .
-      dockerfile: web/Dockerfile
+    image: infinitecanvas/update-notifier-web:latest
     restart: unless-stopped
     depends_on:
       - api
     networks:
-      - default
-      - traefik
+      - public
     labels:
       - traefik.enable=true
-      - traefik.docker.network=${TRAEFIK_NETWORK:-traefik}
+      - traefik.docker.network=public
       - traefik.http.routers.updatenotifier-web.rule=Host(`${DOMAIN:?set DOMAIN in .env}`)
       - traefik.http.routers.updatenotifier-web.priority=1
       - traefik.http.routers.updatenotifier-web.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}
+      - traefik.http.routers.updatenotifier-web.tls.certresolver=${TRAEFIK_CERTRESOLVER:-infinitecanvas-resolver}
       - traefik.http.services.updatenotifier-web.loadbalancer.server.port=8080
-      # - traefik.http.routers.updatenotifier-web.tls.certresolver=${TRAEFIK_CERTRESOLVER}
 
 networks:
-  traefik:
+  backend: # internal api <-> bot traffic
+    external: true
+  public: # traefik edge
     external: true
